@@ -149,6 +149,15 @@ def get_patient(patient_id: str):
     return patient
 
 
+@app.post("/api/pt-plan")
+def pt_plan():
+    """Stream an 8-hour PT shift plan for the highest-risk residents (plain text)."""
+    return StreamingResponse(
+        stream_pt_plan(_scored_patients(datetime.utcnow())),
+        media_type="text/plain; charset=utf-8",
+    )
+
+
 @app.get("/api/config")
 def get_scoring_config():
     cfg = get_config()
