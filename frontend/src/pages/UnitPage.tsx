@@ -5,7 +5,7 @@ import { PatientDrawer } from "../components/PatientDrawer/PatientDrawer";
 import { PtPlanModal } from "../components/PtPlanModal/PtPlanModal";
 import { useUnitWebSocket } from "../hooks/useWebSocket";
 import type { UnitDetail, PatientScore } from "../types";
-import { TIER_LABELS } from "../types";
+import { CARE_LEVEL_NAMES, byPriority } from "../types";
 
 const UNIT_ID = "sunrise";
 
@@ -15,7 +15,7 @@ export function UnitPage() {
   const [selectedPatient, setSelectedPatient] = useState<PatientScore | null>(null);
   const [showPtPlan, setShowPtPlan] = useState(false);
 
-  const { patients: wsPatients, connected } = useUnitWebSocket(UNIT_ID);
+  const { patients: wsPatients } = useUnitWebSocket(UNIT_ID);
 
   useEffect(() => {
     api.getUnit(UNIT_ID)
@@ -47,7 +47,7 @@ export function UnitPage() {
 
   const tierCounts = [1, 2, 3, 4, 5].map((t) => ({
     tier: t,
-    count: patients.filter((p) => p.tier === t).length,
+    count: patients.filter((p) => p.care_level === t).length,
   }));
 
   return (
@@ -67,10 +67,6 @@ export function UnitPage() {
             >
               Generate PT plan
             </button>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-gray-400"}`} />
-              <span className="text-xs text-gray-500">{connected ? "Live" : "Polling"}</span>
-            </div>
           </div>
         </div>
 
@@ -82,8 +78,8 @@ export function UnitPage() {
               <div key={tier} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border shadow-sm"
                 style={{ borderColor: accents + "44" }}>
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: accents }} />
-                <span className="text-xs font-semibold" style={{ color: accents }}>T{tier}</span>
-                <span className="text-xs text-slate-400">{TIER_LABELS[tier]}</span>
+                <span className="text-xs font-semibold" style={{ color: accents }}>L{tier}</span>
+                <span className="text-xs text-slate-400">{CARE_LEVEL_NAMES[tier]}</span>
                 <span className="text-sm font-bold text-slate-800 ml-0.5">{count}</span>
               </div>
             );
@@ -100,25 +96,25 @@ export function UnitPage() {
 
         {/* List view — sorted by EHI */}
         <div className="mt-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">All Patients — sorted by Harm Index</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">All Residents — by Care Level, then Harm Index</h2>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-200">
                 <tr>
                   <th className="px-3 py-2 text-left">Bed</th>
                   <th className="px-3 py-2 text-left">Patient</th>
-                  <th className="px-3 py-2 text-center">Tier</th>
-                  <th className="px-3 py-2 text-right">FLS</th>
-                  <th className="px-3 py-2 text-right">ISS</th>
+                  <th className="px-3 py-2 text-center">Care Level</th>
+                  <th className="px-3 py-2 text-right">Fall</th>
+                  <th className="px-3 py-2 text-left">Injury</th>
                   <th className="px-3 py-2 text-right">EHI</th>
                   <th className="px-3 py-2 text-left">Flags</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {[...patients]
-                  .sort((a, b) => b.ehi - a.ehi)
+                  .sort(byPriority)
                   .map((p) => {
-                    const accent = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][p.tier-1];
+                    const accent = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][p.care_level-1];
                     return (
                     <tr
                       key={p.patient_id}
@@ -129,10 +125,10 @@ export function UnitPage() {
                       <td className="px-3 py-2 text-slate-700 font-medium">{p.name}</td>
                       <td className="px-3 py-2 text-center">
                         <span className="px-2 py-0.5 rounded-full text-xs font-bold"
-                          style={{ background: accent + "18", color: accent }}>T{p.tier}</span>
+                          style={{ background: accent + "18", color: accent }}>L{p.care_level}</span>
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-600">{p.fls}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{p.iss}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{p.fall_score}</td>
+                      <td className="px-3 py-2 text-slate-600">{p.injury_level}</td>
                       <td className="px-3 py-2 text-right font-bold text-slate-800">{p.ehi.toFixed(0)}</td>
                       <td className="px-3 py-2 text-xs text-orange-500 font-medium">
                         {p.risk_rising && "↑ Rising "}
