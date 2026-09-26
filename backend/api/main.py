@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from scoring.engine import score_patient
-from scoring.models import ScoringConfig, Tier
+from scoring.models import ScoringConfig
+from scoring.nursing_home import score_unit
 from synthetic.generator import build_demo_unit
 from api.pt_plan import stream_pt_plan
 
@@ -51,22 +51,29 @@ def get_demo_unit() -> dict:
     return _demo_unit
 
 
-def _score_to_dict(result, patient_meta: dict) -> dict:
+def _score_to_dict(result, patient_meta: dict, cfg: ScoringConfig) -> dict:
+    care = cfg.get("nursing_home", "care_levels", result.care_level, default={})
     return {
         "patient_id": result.patient_id,
         "name": patient_meta.get("name", result.patient_id),
         "bed": patient_meta.get("bed", ""),
         "description": patient_meta.get("description", ""),
         "calculated_at": result.calculated_at.isoformat(),
-        "fls": result.fls,
-        "iss_bone": result.iss_bone,
-        "iss_bleed": result.iss_bleed,
-        "iss": result.iss,
+        "fall_score": result.fall_score,
+        "fall_level": result.fall_level,
+        "bone_points": result.bone_points,
+        "bone_percentile": result.bone_percentile,
+        "bone_level": result.bone_level,
+        "bleed_level": result.bleed_level,
+        "injury_level": result.injury_level,
         "ehi": result.ehi,
-        "tier": result.tier.value,
+        "care_level": result.care_level,
+        "care_level_name": care.get("name", ""),
+        "care_actions": care.get("actions", ""),
         "config_version": result.config_version,
         "data_gaps": result.data_gaps,
         "risk_rising": result.risk_rising,
+        "phenotype": result.phenotype,
         "factors": [
             {
                 "id": f.id,
@@ -90,11 +97,11 @@ def _score_to_dict(result, patient_meta: dict) -> dict:
 
 
 def _scored_patients(now: datetime) -> list[dict]:
+    """Score the whole facility at once — bone levels are banded by facility percentile."""
     cfg = get_config()
-    return [
-        _score_to_dict(score_patient(p_meta["state"], now, cfg), p_meta)
-        for p_meta in get_demo_unit()["patients"]
-    ]
+    patients = get_demo_unit()["patients"]
+    results = score_unit([p["state"] for p in patients], now, cfg)
+    return [_score_to_dict(r, p, cfg) for r, p in zip(results, patients)]
 
 
 @app.get("/health")
@@ -125,9 +132,9 @@ def get_unit(unit_id: str):
         "patients": scored_patients,
         "summary": {
             "total": len(scored_patients),
-            "by_tier": {
-                str(t.value): sum(1 for p in scored_patients if p["tier"] == t.value)
-                for t in Tier
+            "by_care_level": {
+                str(level): sum(1 for p in scored_patients if p["care_level"] == level)
+                for level in range(1, 6)
             },
         },
     }
@@ -135,26 +142,11 @@ def get_unit(unit_id: str):
 
 @app.get("/api/patients/{patient_id}")
 def get_patient(patient_id: str):
-    unit = get_demo_unit()
-    cfg = get_config()
-    now = datetime.utcnow()
-
-    p_meta = next((p for p in unit["patients"] if p["id"] == patient_id), None)
-    if not p_meta:
+    patient = next((p for p in _scored_patients(datetime.utcnow()) if p["patient_id"] == patient_id), None)
+    if not patient:
         from fastapi import HTTPException
         raise HTTPException(404, detail="Patient not found")
-
-    result = score_patient(p_meta["state"], now, cfg)
-    return _score_to_dict(result, p_meta)
-
-
-@app.post("/api/pt-plan")
-def pt_plan():
-    """Stream an 8-hour PT shift plan for the highest-risk residents (plain text)."""
-    return StreamingResponse(
-        stream_pt_plan(_scored_patients(datetime.utcnow())),
-        media_type="text/plain; charset=utf-8",
-    )
+    return patient
 
 
 @app.get("/api/config")

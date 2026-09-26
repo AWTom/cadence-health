@@ -1,8 +1,8 @@
-# FallGuard Scoring Configuration v0.1
+# FallGuard Scoring Configuration v0.2
 # All weights, thresholds, and time windows are here — never hard-coded in the engine.
 # Edit via the admin UI (changes are versioned in the DB).
 
-version: "0.1"
+version: "0.2"
 
 recalculate_interval_minutes: 15
 score_change_alert_threshold: 15  # "Risk rising" flag if FLS rises >= this within 6h
@@ -146,3 +146,119 @@ interventions:
 # ROI defaults
 roi:
   cost_per_injurious_fall: 14000  # USD, source: AHRQ
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Nursing home setting (scoring mechanics v0.2, section 3).
+# Bone points come from FRAiL (Berry et al., 2018); everything else is a starting
+# heuristic to be calibrated on facility data.
+nursing_home:
+  levels:            # Fall Score bands (0-100)
+    low_max: 24
+    medium_max: 49
+
+  mds_overdue_days: 92   # quarterly MDS; older → "Data gap" badge + missing_data_penalty
+
+  risk_rising:
+    points: 15
+    window_days: 7
+
+  fall:
+    recent_fall:
+      within_30d: 25
+      within_180d: 15
+    mobility:            # MDS GG walking + transfers, as observed behaviour
+      steady: 0
+      aid_or_supervision: 15
+      needs_help_gets_up_alone: 25
+      cannot_stand: 0    # bedbound residents rarely fall
+    cognition:           # BIMS (MDS C) + behaviours (MDS E)
+      intact: 0
+      moderate_or_forgets_limits: 10
+      severe_restless_or_wanders: 15
+    fall_risk_med_points: [0, 5, 10, 15]   # by count of classes: 0 / 1 / 2 / 3+
+    # Med class → fall-risk class group (several drug classes share one group)
+    fall_risk_classes:
+      antipsychotic: antipsychotics
+      benzodiazepine: sedatives
+      sleep: sedatives
+      opioid: opioids
+      antidepressant: antidepressants
+      ssri: antidepressants
+      anticonvulsant: anticonvulsants
+      antihypertensive: bp_and_diuretics
+      diuretic: bp_and_diuretics
+    recent_change:
+      window_days: 7
+      new_or_increased_drug: 10
+      acute_illness: 10  # new infection, antibiotic, fever or hospital return
+      cap: 20
+    bathroom_urgency: 10
+    dizziness_orthostatic_vision: 5
+
+  bone:                  # FRAiL-Points (injury mode excludes previous fall + wandering)
+    mode: injury         # injury | full
+    female: 4
+    walking:
+      independent: 15
+      limited: 11
+      extensive: 8
+      total: 0
+    transfers:
+      independent: 10
+      limited: 9
+      extensive: 4
+      total: 0
+    adl:
+      independent: 10
+      extensive_1: 10
+      extensive_2: 7
+      dependent: 4
+      total: 0
+    bladder:
+      continent: 6
+      frequent: 3
+      total: 0
+    bmi_bands:           # [minimum BMI, points], checked top-down
+      - [30, 0]
+      - [26, 3]
+      - [22, 7]
+      - [18.5, 10]
+      - [0, 14]
+    cognition:
+      intact: 0
+      moderate: 1
+      severe: 3
+    diabetes_female: 2
+    drug_classes:
+      benzodiazepine: 2
+      ssri: 2
+      cholinesterase_inhibitor: 2
+      alpha_blocker: -2
+    easily_distracted: 1
+    pressure_ulcer: -3
+    osteoarthritis: -1
+    previous_fall_full_mode: 5
+    wandering_full_mode: 6
+    percentile_bands:    # facility percentile of bone points
+      high_min: 80       # top 20%
+      medium_min: 50     # next 30%
+
+  bleed:
+    recent_fall_days: 30
+
+  care_levels:
+    1:
+      name: Routine
+      actions: Normal rounds
+    2:
+      name: Watch
+      actions: Call light, walker and glasses always in reach
+    3:
+      name: Careful
+      actions: Help to the bathroom after meals and at bedtime; non-slip socks
+    4:
+      name: High Alert
+      actions: Level 3 plus hourly checks overnight; room near the station if possible; hip protectors if Injury is High
+    5:
+      name: Top Priority
+      actions: Level 4 plus named at every shift handoff; flag for nurse or pharmacist medication review; consider a sensor or camera per the care plan (document the reason, since alarms can count as restraints under CMS F604)

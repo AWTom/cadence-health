@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import type { BedConfig, PatientScore } from "../../types";
-import { TIER_LABELS } from "../../types";
+import { CARE_LEVEL_NAMES } from "../../types";
 import { BedTile } from "./BedTile";
 
 interface Props {
@@ -63,7 +63,7 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
       beds
         .filter((b) => {
           const p = patientByBed.get(b.bed_id);
-          return p ? p.tier === tierFilter : false;
+          return p ? p.care_level === tierFilter : false;
         })
         .map((b) => b.bed_id)
     );
@@ -81,7 +81,7 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
           All
         </button>
         {[1, 2, 3, 4, 5].map((t) => {
-          const cnt = patients.filter((p) => p.tier === t).length;
+          const cnt = patients.filter((p) => p.care_level === t).length;
           const active = tierFilter === t;
           const accents = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][t-1];
           return (
@@ -93,7 +93,7 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
                 ? { background: accents, color: "#fff", borderColor: accents }
                 : { background: "#fff", color: accents, borderColor: accents + "55" }}
             >
-              T{t} · {cnt}
+              L{t} · {cnt}
             </button>
           );
         })}
@@ -271,9 +271,9 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
                 style={{ background: colors.bg, border: `1.5px solid ${colors.border}`, color: colors.text }}
                 className="px-2 py-0.5 rounded font-semibold"
               >
-                T{t}
+                L{t}
               </span>
-              {TIER_LABELS[t]}
+              {CARE_LEVEL_NAMES[t]}
             </span>
           );
         })}

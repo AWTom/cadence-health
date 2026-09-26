@@ -14,21 +14,29 @@ export interface Factor {
   evidence: Evidence[];
 }
 
+export type Level = "Low" | "Medium" | "High";
+
 export interface PatientScore {
   patient_id: string;
   name: string;
   bed: string;
   description: string;
   calculated_at: string;
-  fls: number;
-  iss_bone: number;
-  iss_bleed: number;
-  iss: number;
+  fall_score: number;
+  fall_level: Level;
+  bone_points: number;
+  bone_percentile: number;
+  bone_level: Level;
+  bleed_level: Level;
+  injury_level: Level;
   ehi: number;
-  tier: 1 | 2 | 3 | 4 | 5;
+  care_level: 1 | 2 | 3 | 4 | 5;
+  care_level_name: string;
+  care_actions: string;
   config_version: string;
   data_gaps: string[];
   risk_rising: boolean;
+  phenotype: string | null;
   factors: Factor[];
 }
 
@@ -50,19 +58,23 @@ export interface UnitDetail {
   patients: PatientScore[];
   summary: {
     total: number;
-    by_tier: Record<string, number>;
+    by_care_level: Record<string, number>;
   };
 }
 
-export const TIER_LABELS: Record<number, string> = {
-  1: "Low",
-  2: "Low-Mod",
-  3: "Moderate",
-  4: "High",
-  5: "Critical",
+export const CARE_LEVEL_NAMES: Record<number, string> = {
+  1: "Routine",
+  2: "Watch",
+  3: "Careful",
+  4: "High Alert",
+  5: "Top Priority",
 };
 
-export const TIER_COLORS: Record<number, { bg: string; text: string; border: string }> = {
+/** Care Level first, then EHI within a level (spec 1.3). */
+export const byPriority = (a: PatientScore, b: PatientScore) =>
+  b.care_level - a.care_level || b.ehi - a.ehi;
+
+export const CARE_LEVEL_COLORS: Record<number, { bg: string; text: string; border: string }> = {
   1: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
   2: { bg: "#e0f2fe", text: "#0369a1", border: "#7dd3fc" },
   3: { bg: "#fef9c3", text: "#854d0e", border: "#fde047" },
