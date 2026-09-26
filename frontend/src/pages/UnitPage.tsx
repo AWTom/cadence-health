@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { FloorMap } from "../components/FloorMap/FloorMap";
 import { PatientDrawer } from "../components/PatientDrawer/PatientDrawer";
+import { PtPlanModal } from "../components/PtPlanModal/PtPlanModal";
 import { useUnitWebSocket } from "../hooks/useWebSocket";
 import type { UnitDetail, PatientScore } from "../types";
 import { TIER_LABELS } from "../types";
@@ -12,6 +13,7 @@ export function UnitPage() {
   const [unit, setUnit] = useState<UnitDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<PatientScore | null>(null);
+  const [showPtPlan, setShowPtPlan] = useState(false);
 
   const { patients: wsPatients, connected } = useUnitWebSocket(UNIT_ID);
 
@@ -58,9 +60,17 @@ export function UnitPage() {
             <h1 className="text-xl font-bold text-gray-900">{unit.name}</h1>
             <p className="text-sm text-gray-500">{patients.length} patients · {unit.beds.length} beds</p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-gray-400"}`} />
-            <span className="text-xs text-gray-500">{connected ? "Live" : "Polling"}</span>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowPtPlan(true)}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors"
+            >
+              Generate PT plan
+            </button>
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-gray-400"}`} />
+              <span className="text-xs text-gray-500">{connected ? "Live" : "Polling"}</span>
+            </div>
           </div>
         </div>
 
@@ -136,6 +146,8 @@ export function UnitPage() {
           </div>
         </div>
       </div>
+
+      {showPtPlan && <PtPlanModal onClose={() => setShowPtPlan(false)} />}
 
       {/* Patient drawer — slides in from right */}
       {selectedPatient && (

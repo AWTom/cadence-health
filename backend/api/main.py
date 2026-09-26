@@ -10,11 +10,13 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from scoring.engine import score_patient
 from scoring.models import ScoringConfig, Tier
 from synthetic.generator import build_demo_unit
+from api.pt_plan import stream_pt_plan
 
 CONFIG_PATH = Path(__file__).parents[1] / "scoring_config.yaml"
 
@@ -87,6 +89,14 @@ def _score_to_dict(result, patient_meta: dict) -> dict:
     }
 
 
+def _scored_patients(now: datetime) -> list[dict]:
+    cfg = get_config()
+    return [
+        _score_to_dict(score_patient(p_meta["state"], now, cfg), p_meta)
+        for p_meta in get_demo_unit()["patients"]
+    ]
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "synthetic": True}
@@ -106,13 +116,7 @@ def list_units():
 @app.get("/api/units/{unit_id}")
 def get_unit(unit_id: str):
     unit = get_demo_unit()
-    cfg = get_config()
-    now = datetime.utcnow()
-
-    scored_patients = []
-    for p_meta in unit["patients"]:
-        result = score_patient(p_meta["state"], now, cfg)
-        scored_patients.append(_score_to_dict(result, p_meta))
+    scored_patients = _scored_patients(datetime.utcnow())
 
     return {
         "unit_id": unit["unit_id"],
@@ -144,6 +148,15 @@ def get_patient(patient_id: str):
     return _score_to_dict(result, p_meta)
 
 
+@app.post("/api/pt-plan")
+def pt_plan():
+    """Stream an 8-hour PT shift plan for the highest-risk residents (plain text)."""
+    return StreamingResponse(
+        stream_pt_plan(_scored_patients(datetime.utcnow())),
+        media_type="text/plain; charset=utf-8",
+    )
+
+
 @app.get("/api/config")
 def get_scoring_config():
     cfg = get_config()
@@ -157,13 +170,8 @@ async def unit_websocket(websocket: WebSocket, unit_id: str):
     try:
         while True:
             # Push updated scores every 15 seconds
-            unit = get_demo_unit()
-            cfg = get_config()
             now = datetime.utcnow()
-            scores = []
-            for p_meta in unit["patients"]:
-                result = score_patient(p_meta["state"], now, cfg)
-                scores.append(_score_to_dict(result, p_meta))
+            scores = _scored_patients(now)
 
             await websocket.send_json({"type": "scores_update", "data": scores, "timestamp": now.isoformat()})
             await asyncio.sleep(15)

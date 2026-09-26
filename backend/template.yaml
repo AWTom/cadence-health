@@ -20,8 +20,8 @@ Resources:
       Runtime: python3.12
       Architectures: [arm64]
       MemorySize: 512
-      # Headroom for upcoming Bedrock calls; Function URLs allow up to 15 min.
-      Timeout: 60
+      # Headroom for streamed Bedrock PT plans; Function URLs allow up to 15 min.
+      Timeout: 120
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerArm64:30
       Environment:
@@ -31,6 +31,8 @@ Resources:
           AWS_LWA_READINESS_CHECK_PATH: /health
           PORT: "8000"
           CORS_ORIGINS: !Ref CorsOrigins
+          BEDROCK_REGION: us-east-1
+          BEDROCK_MODEL_ID: openai.gpt-oss-120b-1:0
       LoggingConfig:
         LogGroup: !Ref ApiLogGroup
       # SAM adds both public-invoke permissions (InvokeFunctionUrl + InvokeFunction).
