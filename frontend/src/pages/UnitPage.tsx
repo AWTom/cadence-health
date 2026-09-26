@@ -11,10 +11,10 @@ export function UnitPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<PatientScore | null>(null);
 
-  const { patients: wsPatients, connected } = useUnitWebSocket("4E");
+  const { patients: wsPatients, connected } = useUnitWebSocket("7M");
 
   useEffect(() => {
-    api.getUnit("4E")
+    api.getUnit("7M")
       .then(setUnit)
       .catch((e: Error) => setError(e.message));
   }, []);

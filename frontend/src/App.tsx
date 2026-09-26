@@ -10,9 +10,6 @@ function Nav() {
       <span className="font-bold text-lg tracking-tight mr-4">FallGuard</span>
       <NavLink to="/" end className={linkClass}>Unit Map</NavLink>
       <div className="flex-1" />
-      <span className="text-xs bg-amber-500 text-white px-2 py-1 rounded font-semibold">
-        SYNTHETIC DATA — NOT FOR CLINICAL USE
-      </span>
     </nav>
   );
 }

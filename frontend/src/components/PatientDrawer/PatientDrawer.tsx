@@ -142,8 +142,7 @@ export function PatientDrawer({ patient, onClose }: Props) {
       {/* Footer: last calculated */}
       <div className="p-3 border-t border-gray-200 text-xs text-gray-400">
         Scored {new Date(patient.calculated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ·
-        Config v{patient.config_version} ·{" "}
-        <span className="font-medium text-amber-600">SYNTHETIC DATA — NOT FOR CLINICAL USE</span>
+        Config v{patient.config_version}
       </div>
     </div>
   );

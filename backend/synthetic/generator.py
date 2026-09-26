@@ -70,7 +70,7 @@ def make_tier5_patient(now: datetime) -> dict[str, Any]:
         height_cm=158.0,
         bmi=17.6,
     )
-    return {"id": "P001", "name": "Patient 001", "bed": "4E-14", "state": state,
+    return {"id": "P001", "name": "Patient 001", "bed": "7M-714", "state": state,
             "description": "88F osteoporosis, prior hip fx, apixaban, CAM+, post-lorazepam"}
 
 
@@ -109,7 +109,7 @@ def make_postop_knee_patient(now: datetime) -> dict[str, Any]:
         height_cm=178.0,
         bmi=28.7,
     )
-    return {"id": "P002", "name": "Patient 002", "bed": "4E-08", "state": state,
+    return {"id": "P002", "name": "Patient 002", "bed": "7M-705", "state": state,
             "description": "68M post-op day 1 TKR, adductor canal block, PRN oxycodone"}
 
 
@@ -141,7 +141,7 @@ def make_low_risk_patient(now: datetime) -> dict[str, Any]:
         height_cm=175.0,
         bmi=26.8,
     )
-    return {"id": "P003", "name": "Patient 003", "bed": "4E-02", "state": state,
+    return {"id": "P003", "name": "Patient 003", "bed": "7M-702", "state": state,
             "description": "45M pneumonia, no fall risk factors"}
 
 
@@ -180,7 +180,7 @@ def make_dialysis_warfarin_patient(now: datetime) -> dict[str, Any]:
         height_cm=172.0,
         bmi=18.3,
     )
-    return {"id": "P004", "name": "Patient 004", "bed": "4E-06", "state": state,
+    return {"id": "P004", "name": "Patient 004", "bed": "7M-716", "state": state,
             "description": "72M dialysis, warfarin, INR 3.4, low BMI"}
 
 
@@ -222,17 +222,49 @@ def make_ciwa_patient(now: datetime) -> dict[str, Any]:
         height_cm=180.0,
         bmi=24.4,
     )
-    return {"id": "P005", "name": "Patient 005", "bed": "4E-11", "state": state,
+    return {"id": "P005", "name": "Patient 005", "bed": "7M-719", "state": state,
             "description": "54M alcohol withdrawal, CIWA 14, rising"}
 
 
-# Canonical demo unit — 28 beds on 4-East Med/Surg
-UNIT_BEDS = [
-    {"bed_id": f"4E-{n:02d}", "room": f"4{n//2*2+1:02d}", "distance_to_station": max(1, abs(n - 7)),
-     "has_camera": n in (1, 2, 7, 8), "low_bed": n % 4 == 0, "has_alarm": True,
-     "x": (n % 7) * 140 + 60, "y": (n // 7) * 120 + 80}
-    for n in range(1, 29)
-]
+# UCSF Mission Bay — 7M Medical/Surgical, Floor 7 (Adult Hospital)
+# Double-loaded corridor: 10 north rooms (bay-facing, 701-710) + 10 south rooms (campus-facing, 711-720)
+# SVG layout: north rooms at y=30, south rooms at y=505, 118px horizontal pitch
+# Nurses' station in central zone between corridors; camera rooms cluster around center
+
+def _ucsf_beds() -> list[dict]:
+    beds = []
+    # North wall — bay-facing (701-710), rooms closer to center have camera coverage
+    for i, room_num in enumerate(range(701, 711)):
+        dist = abs(i - 4.5) + 1  # rooms 705/706 nearest nurses' station
+        beds.append({
+            "bed_id": f"7M-{room_num}",
+            "room": str(room_num),
+            "distance_to_station": round(dist, 1),
+            "has_camera": i in (3, 4, 5, 6),   # 704-707 have virtual-sitter cameras
+            "low_bed": i in (0, 5, 9),
+            "has_alarm": True,
+            "x": 70 + i * 118,
+            "y": 30,
+            "side": "north",
+        })
+    # South wall — campus-facing (711-720)
+    for i, room_num in enumerate(range(711, 721)):
+        dist = abs(i - 4.5) + 1
+        beds.append({
+            "bed_id": f"7M-{room_num}",
+            "room": str(room_num),
+            "distance_to_station": round(dist, 1),
+            "has_camera": i in (3, 4, 5, 6),   # 714-717
+            "low_bed": i in (1, 6, 9),
+            "has_alarm": True,
+            "x": 70 + i * 118,
+            "y": 505,
+            "side": "south",
+        })
+    return beds
+
+
+UNIT_BEDS = _ucsf_beds()
 
 
 def build_demo_unit(now: datetime) -> dict:
@@ -248,7 +280,7 @@ def build_demo_unit(now: datetime) -> dict:
     # Fill remaining beds with low-to-moderate risk patients
     filler_beds = [b for b in UNIT_BEDS if b["bed_id"] not in {p["bed"] for p in scripted}]
     fillers = []
-    for i, bed in enumerate(filler_beds[:10]):
+    for i, bed in enumerate(filler_beds[:12]):
         fillers.append({
             "id": f"P{10+i:03d}",
             "name": f"Patient {10+i:03d}",
@@ -258,8 +290,8 @@ def build_demo_unit(now: datetime) -> dict:
         })
 
     return {
-        "unit_id": "4E",
-        "name": "4-East Medical/Surgical",
+        "unit_id": "7M",
+        "name": "7M — Medical/Surgical · UCSF Mission Bay",
         "beds": UNIT_BEDS,
         "patients": scripted + fillers,
     }
