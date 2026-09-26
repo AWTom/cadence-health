@@ -88,10 +88,10 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
             <button
               key={t}
               onClick={() => setTierFilter(active ? 0 : t)}
-              className="px-3 py-1 rounded-full text-xs font-semibold border transition-all"
+              className="px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all"
               style={active
                 ? { background: accents, color: "#fff", borderColor: accents }
-                : { background: "#fff", color: accents, borderColor: accents + "55" }}
+                : { background: "#fff", color: "#64748b", borderColor: accents + "33" }}
             >
               L{t} · {cnt}
             </button>

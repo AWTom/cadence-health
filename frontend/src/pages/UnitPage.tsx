@@ -8,12 +8,21 @@ import type { UnitDetail, PatientScore } from "../types";
 import { CARE_LEVEL_NAMES, byPriority } from "../types";
 
 const UNIT_ID = "sunrise";
+const HINT_KEY = "fallguard.ptPlanHint";
 
 export function UnitPage() {
   const [unit, setUnit] = useState<UnitDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<PatientScore | null>(null);
   const [showPtPlan, setShowPtPlan] = useState(false);
+  const [showHint, setShowHint] = useState(() => {
+    try { return localStorage.getItem(HINT_KEY) !== "done"; } catch { return true; }
+  });
+
+  const dismissHint = () => {
+    setShowHint(false);
+    try { localStorage.setItem(HINT_KEY, "done"); } catch { /* storage unavailable */ }
+  };
 
   const { patients: wsPatients } = useUnitWebSocket(UNIT_ID);
 
@@ -55,18 +64,32 @@ export function UnitPage() {
       {/* Main content */}
       <div className="flex-1 overflow-y-auto p-4 min-w-0">
         {/* Unit header */}
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center mb-4 flex-wrap gap-x-5 gap-y-2">
           <div>
             <h1 className="text-xl font-bold text-gray-900">{unit.name}</h1>
             <p className="text-sm text-gray-500">{patients.length} patients · {unit.beds.length} beds</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="relative">
             <button
-              onClick={() => setShowPtPlan(true)}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors"
+              onClick={() => { dismissHint(); setShowPtPlan(true); }}
+              className={`px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors ${showHint ? "ring-4 ring-blue-200 animate-pulse" : ""}`}
             >
               Generate PT plan
             </button>
+            {showHint && (
+              <div role="status" className="absolute left-0 top-full mt-3 z-20 w-64 rounded-lg bg-slate-900 p-3 text-xs text-white shadow-lg">
+                {/* arrow pointing up at the button */}
+                <span className="absolute -top-1.5 left-6 h-3 w-3 rotate-45 bg-slate-900" />
+                <p className="font-semibold text-blue-300">Start here</p>
+                <p className="mt-1 leading-relaxed">
+                  Click <span className="font-semibold">Generate PT plan</span> to draft today's 8-hour therapy
+                  schedule for the highest-risk residents.
+                </p>
+                <button onClick={dismissHint} className="mt-2 font-semibold text-blue-300 hover:text-white">
+                  Got it
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -75,12 +98,11 @@ export function UnitPage() {
           {tierCounts.map(({ tier, count }) => {
             const accents = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][tier-1];
             return (
-              <div key={tier} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border shadow-sm"
-                style={{ borderColor: accents + "44" }}>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: accents }} />
-                <span className="text-xs font-semibold" style={{ color: accents }}>L{tier}</span>
+              <div key={tier} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200">
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-70" style={{ background: accents }} />
+                <span className="text-xs font-medium text-slate-500">L{tier}</span>
                 <span className="text-xs text-slate-400">{CARE_LEVEL_NAMES[tier]}</span>
-                <span className="text-sm font-bold text-slate-800 ml-0.5">{count}</span>
+                <span className="text-xs font-semibold text-slate-600 ml-0.5">{count}</span>
               </div>
             );
           })}
