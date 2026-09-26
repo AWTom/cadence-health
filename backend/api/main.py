@@ -17,6 +17,7 @@ from scoring.models import ScoringConfig
 from scoring.nursing_home import score_unit
 from synthetic.generator import build_demo_unit
 from api.pt_plan import stream_pt_plan
+from api.savings_report import stream_savings_report
 
 CONFIG_PATH = Path(__file__).parents[1] / "scoring_config.yaml"
 
@@ -154,6 +155,19 @@ def pt_plan():
     """Stream an 8-hour PT shift plan for the highest-risk residents (plain text)."""
     return StreamingResponse(
         stream_pt_plan(_scored_patients(datetime.utcnow())),
+        media_type="text/plain; charset=utf-8",
+    )
+
+
+class SavingsReportRequest(BaseModel):
+    plan: str
+
+
+@app.post("/api/savings-report")
+def savings_report(req: SavingsReportRequest):
+    """Stream an administrative cost savings report for a PT plan (plain text, tool-driven math)."""
+    return StreamingResponse(
+        stream_savings_report(req.plan, _scored_patients(datetime.utcnow()), get_config().raw),
         media_type="text/plain; charset=utf-8",
     )
 

@@ -5,6 +5,7 @@ EXPECTED = {
     ("GET", "/api/units/{unit_id}"),
     ("GET", "/api/patients/{patient_id}"),
     ("POST", "/api/pt-plan"),
+    ("POST", "/api/savings-report"),
 }
 
 

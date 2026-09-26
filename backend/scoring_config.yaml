@@ -137,15 +137,26 @@ placement:
 
 # Intervention effectiveness (placeholder — needs literature review)
 interventions:
+  pt_exercise_fall_reduction: 0.23   # supervised exercise/PT; Cochrane 2019 (community) — care-home evidence weaker
   sitter_fall_reduction: 0.60
   virtual_monitor_fall_reduction: 0.40
   bed_alarm_fall_reduction: 0.20
   low_bed_injury_reduction: 0.30
   hip_protector_injury_reduction: 0.50
 
-# ROI defaults
+# ROI defaults (heuristics for the admin savings report — calibrate on facility data)
 roi:
   cost_per_injurious_fall: 14000  # USD, source: AHRQ
+  cost_per_non_injurious_fall: 1000  # USD, staff time, assessment, incident review (heuristic)
+  # Annual fall probability from Fall Score: base + per_point * score, capped
+  annual_fall_prob_base: 0.10
+  annual_fall_prob_per_point: 0.008
+  annual_fall_prob_cap: 0.90
+  # Share of falls causing injury, by Injury level (heuristic)
+  injurious_fall_fraction:
+    Low: 0.05
+    Medium: 0.10
+    High: 0.20
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Nursing home setting (scoring mechanics v0.2, section 3).

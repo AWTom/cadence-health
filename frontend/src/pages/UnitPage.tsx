@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { FloorMap } from "../components/FloorMap/FloorMap";
 import { PatientDrawer } from "../components/PatientDrawer/PatientDrawer";
 import { PtPlanModal } from "../components/PtPlanModal/PtPlanModal";
+import { usePtPlan } from "../hooks/usePtPlan";
 import { useUnitWebSocket } from "../hooks/useWebSocket";
 import type { UnitDetail, PatientScore } from "../types";
 import { CARE_LEVEL_NAMES, byPriority } from "../types";
@@ -10,18 +11,29 @@ import { CARE_LEVEL_NAMES, byPriority } from "../types";
 const UNIT_ID = "sunrise";
 const HINT_KEY = "fallguard.ptPlanHint";
 
+// Breadcrumb tutorial: generate a PT plan, then open a resident
+type TutorialStep = "pt-plan" | "patient" | "done";
+
 export function UnitPage() {
   const [unit, setUnit] = useState<UnitDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<PatientScore | null>(null);
   const [showPtPlan, setShowPtPlan] = useState(false);
-  const [showHint, setShowHint] = useState(() => {
-    try { return localStorage.getItem(HINT_KEY) !== "done"; } catch { return true; }
+  const [step, setStepState] = useState<TutorialStep>(() => {
+    try {
+      const saved = localStorage.getItem(HINT_KEY);
+      return saved === "patient" || saved === "done" ? saved : "pt-plan";
+    } catch { return "pt-plan"; }
   });
 
-  const dismissHint = () => {
-    setShowHint(false);
-    try { localStorage.setItem(HINT_KEY, "done"); } catch { /* storage unavailable */ }
+  const setStep = (next: TutorialStep) => {
+    setStepState(next);
+    try { localStorage.setItem(HINT_KEY, next); } catch { /* storage unavailable */ }
+  };
+
+  const selectPatient = (p: PatientScore | null) => {
+    if (p && step === "patient") setStep("done");
+    setSelectedPatient(p);
   };
 
   const { patients: wsPatients } = useUnitWebSocket(UNIT_ID);
@@ -34,6 +46,14 @@ export function UnitPage() {
 
   // Merge REST-loaded unit data with live WebSocket score updates
   const patients = wsPatients.length > 0 ? wsPatients : unit?.patients ?? [];
+  const { plan, report, generatePlan, generateReport } = usePtPlan(patients);
+  const hasPlan = plan.status !== "idle";
+
+  const openNewPlan = () => {
+    if (step === "pt-plan") setStep("patient");
+    generatePlan();
+    setShowPtPlan(true);
+  };
 
   if (error) {
     return (
@@ -69,23 +89,31 @@ export function UnitPage() {
             <h1 className="text-xl font-bold text-gray-900">{unit.name}</h1>
             <p className="text-sm text-gray-500">{patients.length} patients · {unit.beds.length} beds</p>
           </div>
-          <div className="relative">
+          <div className="relative flex items-center gap-2">
             <button
-              onClick={() => { dismissHint(); setShowPtPlan(true); }}
-              className={`px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors ${showHint ? "ring-4 ring-blue-200 animate-pulse" : ""}`}
+              onClick={openNewPlan}
+              className={`px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors ${step === "pt-plan" ? "ring-4 ring-blue-200 animate-pulse" : ""}`}
             >
-              Generate PT plan
+              {hasPlan ? "Regenerate PT plan" : "Generate PT plan"}
             </button>
-            {showHint && (
+            {hasPlan && (
+              <button
+                onClick={() => setShowPtPlan(true)}
+                className="px-3 py-1.5 rounded-lg border border-blue-600 text-blue-700 text-sm font-semibold hover:bg-blue-50 transition-colors"
+              >
+                View PT plan{plan.status === "streaming" ? " …" : ""}
+              </button>
+            )}
+            {step === "pt-plan" && (
               <div role="status" className="absolute left-0 top-full mt-3 z-20 w-64 rounded-lg bg-slate-900 p-3 text-xs text-white shadow-lg">
                 {/* arrow pointing up at the button */}
                 <span className="absolute -top-1.5 left-6 h-3 w-3 rotate-45 bg-slate-900" />
-                <p className="font-semibold text-blue-300">Start here</p>
+                <p className="font-semibold text-blue-300">Step 1 of 2</p>
                 <p className="mt-1 leading-relaxed">
                   Click <span className="font-semibold">Generate PT plan</span> to draft today's 8-hour therapy
                   schedule for the highest-risk residents.
                 </p>
-                <button onClick={dismissHint} className="mt-2 font-semibold text-blue-300 hover:text-white">
+                <button onClick={() => setStep("patient")} className="mt-2 font-semibold text-blue-300 hover:text-white">
                   Got it
                 </button>
               </div>
@@ -108,11 +136,26 @@ export function UnitPage() {
           })}
         </div>
 
+        {/* Tutorial step 2 — shown once the PT plan modal is closed */}
+        {step === "patient" && !showPtPlan && !selectedPatient && (
+          <div role="status" className="relative mb-4 w-72 rounded-lg bg-slate-900 p-3 text-xs text-white shadow-lg">
+            {/* arrow pointing down at the map */}
+            <span className="absolute -bottom-1.5 left-6 h-3 w-3 rotate-45 bg-slate-900" />
+            <p className="font-semibold text-blue-300">Step 2 of 2</p>
+            <p className="mt-1 leading-relaxed">
+              Click a resident's room on the map to see their Care Level, why they may fall, and what to do.
+            </p>
+            <button onClick={() => setStep("done")} className="mt-2 font-semibold text-blue-300 hover:text-white">
+              Got it
+            </button>
+          </div>
+        )}
+
         {/* Floor map */}
         <FloorMap
           beds={unit.beds}
           patients={patients}
-          onSelectPatient={setSelectedPatient}
+          onSelectPatient={selectPatient}
           selectedPatientId={selectedPatient?.patient_id ?? null}
         />
 
@@ -140,7 +183,7 @@ export function UnitPage() {
                     return (
                     <tr
                       key={p.patient_id}
-                      onClick={() => setSelectedPatient(selectedPatient?.patient_id === p.patient_id ? null : p)}
+                      onClick={() => selectPatient(selectedPatient?.patient_id === p.patient_id ? null : p)}
                       className={`cursor-pointer transition-colors ${selectedPatient?.patient_id === p.patient_id ? "bg-blue-50" : "hover:bg-slate-50"}`}
                     >
                       <td className="px-3 py-2 font-mono text-slate-500 text-xs">{p.bed}</td>
@@ -165,7 +208,14 @@ export function UnitPage() {
         </div>
       </div>
 
-      {showPtPlan && <PtPlanModal onClose={() => setShowPtPlan(false)} />}
+      {showPtPlan && (
+        <PtPlanModal
+          plan={plan}
+          report={report}
+          onGenerateReport={() => generateReport(plan.text)}
+          onClose={() => setShowPtPlan(false)}
+        />
+      )}
 
       {/* Patient drawer — slides in from right */}
       {selectedPatient && (
