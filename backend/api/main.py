@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 import json
+import os
 import yaml
 from datetime import datetime
 from pathlib import Path
@@ -21,7 +22,9 @@ app = FastAPI(title="FallGuard API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=os.environ.get(
+        "CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
+    ).split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

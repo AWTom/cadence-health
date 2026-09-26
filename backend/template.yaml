@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  FallGuard backend — FastAPI on Lambda behind a public Function URL, via the
+  Lambda Web Adapter. WebSockets are not supported here; the frontend falls
+  back to REST.
+
+Parameters:
+  CorsOrigins:
+    Type: String
+    Default: "http://localhost:5173,http://localhost:3000"
+    Description: Comma-separated browser origins allowed by the FastAPI CORS middleware.
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: run.sh
+      Runtime: python3.12
+      Architectures: [arm64]
+      MemorySize: 512
+      # Headroom for upcoming Bedrock calls; Function URLs allow up to 15 min.
+      Timeout: 60
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerArm64:30
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: response_stream
+          AWS_LWA_READINESS_CHECK_PATH: /health
+          PORT: "8000"
+          CORS_ORIGINS: !Ref CorsOrigins
+      LoggingConfig:
+        LogGroup: !Ref ApiLogGroup
+      # SAM adds both public-invoke permissions (InvokeFunctionUrl + InvokeFunction).
+      FunctionUrlConfig:
+        AuthType: NONE
+        # Streaming lets future Bedrock responses flow token-by-token.
+        InvokeMode: RESPONSE_STREAM
+      Policies:
+        - Statement:
+            - Sid: BedrockInference
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource:
+                - arn:aws:bedrock:*::foundation-model/*
+                # Cross-region inference profiles (e.g. us.anthropic.*)
+                - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-api
+      RetentionInDays: 14
+
+Outputs:
+  ApiUrl:
+    Description: Public HTTPS base URL for the backend
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl
