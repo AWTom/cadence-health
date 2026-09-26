@@ -1,0 +1,148 @@
+# FallGuard Scoring Configuration v0.1
+# All weights, thresholds, and time windows are here — never hard-coded in the engine.
+# Edit via the admin UI (changes are versioned in the DB).
+
+version: "0.1"
+
+recalculate_interval_minutes: 15
+score_change_alert_threshold: 15  # "Risk rising" flag if FLS rises >= this within 6h
+score_change_alert_window_hours: 6
+
+missing_data_penalty: 3  # Added when a key assessment is overdue
+
+tier_bands:
+  low_max: 24
+  moderate_max: 49
+
+# Fall Likelihood Score factors
+fls:
+  history:
+    fall_this_admission: 25
+    fall_past_6_months: 15
+
+  age:
+    age_65_74: 5
+    age_75_84: 10
+    age_85_plus: 15
+
+  cognition:
+    cam_positive: 15
+    cam_window_hours: 24
+    dementia: 8
+    rass_nonzero: 5
+    rass_window_hours: 12
+    ciwa_threshold: 10
+    ciwa_points: 10
+    ciwa_window_hours: 12
+
+  medications:
+    frid_class_points: 4
+    frid_cap: 16
+    new_frid_points: 8
+    new_frid_window_hours: 24
+    prn_sedative_opioid_points: 8
+    prn_decay_hours: 6
+    anticholinergic_burden_threshold: 3
+    anticholinergic_burden_points: 6
+
+  hemodynamics:
+    orthostatic_drop_points: 8
+    orthostatic_window_hours: 48
+    sbp_low_threshold: 90
+    sbp_low_points: 5
+    sbp_low_window_hours: 12
+    glucose_low_threshold: 70
+    glucose_low_points: 8
+    glucose_window_hours: 24
+    sodium_low_threshold: 130
+    sodium_low_points: 5
+    hgb_low_threshold: 8
+    hgb_low_points: 5
+
+  mobility:
+    assistance_required: 8
+    neuro_weakness: 6
+    amputation: 6
+    vestibular: 5
+
+  toileting:
+    incontinence: 6
+    diuretic_points: 6
+    diuretic_decay_hours: 6
+    laxative_points: 6
+    laxative_decay_hours: 8
+
+  procedures:
+    postop_day_0_2: 5
+    nerve_block: 10
+    epidural: 6
+    tethers_threshold: 2
+    tethers_points: 4
+
+  sensory:
+    vision_hearing: 3
+    interpreter: 3
+
+  sleep:
+    overnight_interruptions_threshold: 2
+    overnight_interruptions_points: 3
+    overnight_start_hour: 23
+    overnight_end_hour: 5
+
+# Injury Severity Score factors
+iss:
+  bone:
+    osteoporosis: 20
+    osteopenia: 8
+    prior_fragility_fracture: 20
+    osteoporosis_therapy: 5
+    chronic_glucocorticoids: 10
+    bone_weakening_drug_per_class: 4
+    bone_weakening_drug_cap: 8
+    age_80_plus: 10
+    female_sex: 5
+    bmi_low_threshold: 18.5
+    bmi_low_points: 10
+    weight_loss_pct_threshold: 5
+    weight_loss_days: 30
+    weight_loss_points: 5
+    albumin_low_threshold: 3.0
+    albumin_low_points: 5
+    ckd_stage_4_5: 8
+    hyperparathyroidism: 5
+    vitd_low_threshold: 20
+    vitd_low_points: 4
+    bone_metastases_myeloma: 15
+    recent_joint_replacement: 10
+    frailty_scale_threshold: 6
+    frailty_scale_points: 10
+
+  bleed:
+    therapeutic_anticoagulant: 15
+    inr_high_threshold: 3
+    inr_high_points: 10
+    dual_antiplatelet: 8
+    platelets_low_threshold: 50
+    platelets_low_points: 12
+    prior_craniotomy: 20
+
+  combined_minor_weight: 0.25  # ISS = max + 0.25 * min
+
+# Placement optimizer
+placement:
+  base_move_penalty: 5
+  delirious_move_penalty: 10
+  overnight_move_penalty: 8   # 22:00–06:00
+  recent_move_penalty: 8      # moved in last 24h
+
+# Intervention effectiveness (placeholder — needs literature review)
+interventions:
+  sitter_fall_reduction: 0.60
+  virtual_monitor_fall_reduction: 0.40
+  bed_alarm_fall_reduction: 0.20
+  low_bed_injury_reduction: 0.30
+  hip_protector_injury_reduction: 0.50
+
+# ROI defaults
+roi:
+  cost_per_injurious_fall: 14000  # USD, source: AHRQ

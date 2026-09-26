@@ -1,0 +1,168 @@
+"""FallGuard API — FastAPI application."""
+from __future__ import annotations
+import asyncio
+import json
+import yaml
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from scoring.engine import score_patient
+from scoring.models import ScoringConfig, Tier
+from synthetic.generator import build_demo_unit
+
+CONFIG_PATH = Path(__file__).parents[1] / "scoring_config.yaml"
+
+app = FastAPI(title="FallGuard API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_cfg: ScoringConfig | None = None
+_demo_unit: dict | None = None
+_connected_clients: list[WebSocket] = []
+
+
+def get_config() -> ScoringConfig:
+    global _cfg
+    if _cfg is None:
+        raw = yaml.safe_load(CONFIG_PATH.read_text())
+        _cfg = ScoringConfig(version=raw["version"], raw=raw)
+    return _cfg
+
+
+def get_demo_unit() -> dict:
+    global _demo_unit
+    if _demo_unit is None:
+        _demo_unit = build_demo_unit(datetime.utcnow())
+    return _demo_unit
+
+
+def _score_to_dict(result, patient_meta: dict) -> dict:
+    return {
+        "patient_id": result.patient_id,
+        "name": patient_meta.get("name", result.patient_id),
+        "bed": patient_meta.get("bed", ""),
+        "description": patient_meta.get("description", ""),
+        "calculated_at": result.calculated_at.isoformat(),
+        "fls": result.fls,
+        "iss_bone": result.iss_bone,
+        "iss_bleed": result.iss_bleed,
+        "iss": result.iss,
+        "ehi": result.ehi,
+        "tier": result.tier.value,
+        "config_version": result.config_version,
+        "data_gaps": result.data_gaps,
+        "risk_rising": result.risk_rising,
+        "factors": [
+            {
+                "id": f.id,
+                "label": f.label,
+                "points": f.points,
+                "category": f.category,
+                "modifiable": f.modifiable,
+                "evidence": [
+                    {
+                        "source": e.source,
+                        "value": str(e.value),
+                        "unit": e.unit,
+                        "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+                    }
+                    for e in f.evidence
+                ],
+            }
+            for f in sorted(result.factors, key=lambda x: x.points, reverse=True)
+        ],
+    }
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "synthetic": True}
+
+
+@app.get("/api/units")
+def list_units():
+    unit = get_demo_unit()
+    return [{
+        "unit_id": unit["unit_id"],
+        "name": unit["name"],
+        "bed_count": len(unit["beds"]),
+        "patient_count": len(unit["patients"]),
+    }]
+
+
+@app.get("/api/units/{unit_id}")
+def get_unit(unit_id: str):
+    unit = get_demo_unit()
+    cfg = get_config()
+    now = datetime.utcnow()
+
+    scored_patients = []
+    for p_meta in unit["patients"]:
+        result = score_patient(p_meta["state"], now, cfg)
+        scored_patients.append(_score_to_dict(result, p_meta))
+
+    return {
+        "unit_id": unit["unit_id"],
+        "name": unit["name"],
+        "beds": unit["beds"],
+        "patients": scored_patients,
+        "summary": {
+            "total": len(scored_patients),
+            "by_tier": {
+                str(t.value): sum(1 for p in scored_patients if p["tier"] == t.value)
+                for t in Tier
+            },
+        },
+    }
+
+
+@app.get("/api/patients/{patient_id}")
+def get_patient(patient_id: str):
+    unit = get_demo_unit()
+    cfg = get_config()
+    now = datetime.utcnow()
+
+    p_meta = next((p for p in unit["patients"] if p["id"] == patient_id), None)
+    if not p_meta:
+        from fastapi import HTTPException
+        raise HTTPException(404, detail="Patient not found")
+
+    result = score_patient(p_meta["state"], now, cfg)
+    return _score_to_dict(result, p_meta)
+
+
+@app.get("/api/config")
+def get_scoring_config():
+    cfg = get_config()
+    return cfg.raw
+
+
+@app.websocket("/ws/unit/{unit_id}")
+async def unit_websocket(websocket: WebSocket, unit_id: str):
+    await websocket.accept()
+    _connected_clients.append(websocket)
+    try:
+        while True:
+            # Push updated scores every 15 seconds
+            unit = get_demo_unit()
+            cfg = get_config()
+            now = datetime.utcnow()
+            scores = []
+            for p_meta in unit["patients"]:
+                result = score_patient(p_meta["state"], now, cfg)
+                scores.append(_score_to_dict(result, p_meta))
+
+            await websocket.send_json({"type": "scores_update", "data": scores, "timestamp": now.isoformat()})
+            await asyncio.sleep(15)
+    except WebSocketDisconnect:
+        _connected_clients.remove(websocket)
