@@ -70,29 +70,34 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
     <div className="flex flex-col gap-3">
       {/* Tier filter strip */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-gray-500 font-medium">Filter:</span>
+        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wide">Filter</span>
         <button
           onClick={() => setTierFilter(0)}
-          className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${tierFilter === 0 ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
+          className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${tierFilter === 0 ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700"}`}
         >
           All
         </button>
         {[1, 2, 3, 4, 5].map((t) => {
           const cnt = patients.filter((p) => p.tier === t).length;
+          const active = tierFilter === t;
+          const accents = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][t-1];
           return (
             <button
               key={t}
-              onClick={() => setTierFilter(tierFilter === t ? 0 : t)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${tierFilter === t ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
+              onClick={() => setTierFilter(active ? 0 : t)}
+              className="px-3 py-1 rounded-full text-xs font-semibold border transition-all"
+              style={active
+                ? { background: accents, color: "#fff", borderColor: accents }
+                : { background: "#fff", color: accents, borderColor: accents + "55" }}
             >
-              T{t} {TIER_LABELS[t]} ({cnt})
+              T{t} · {cnt}
             </button>
           );
         })}
       </div>
 
       {/* SVG floor plan */}
-      <div className="overflow-auto border border-gray-200 rounded-xl bg-slate-50">
+      <div className="overflow-auto border border-slate-200 rounded-xl bg-white shadow-sm">
         <svg
           width={SVG_W}
           height={SVG_H}
@@ -155,22 +160,22 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
 
           {/* ── Nurses' station (central) ── */}
           <rect x={NS_X} y={SUPPORT_TOP + 20} width={NS_W} height={SUPPORT_H - 40}
-            rx={6} fill="#1e3a5f" stroke="#1e40af" strokeWidth={1.5} />
-          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + 20 + (SUPPORT_H - 40) / 2 - 20}
-            textAnchor="middle" fontSize={13} fill="white" fontWeight="700">
+            rx={8} fill="#eff6ff" stroke="#bfdbfe" strokeWidth={1.5} />
+          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + 20 + (SUPPORT_H - 40) / 2 - 16}
+            textAnchor="middle" fontSize={13} fill="#1e40af" fontWeight="700">
             Nurses' Station
           </text>
-          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + 20 + (SUPPORT_H - 40) / 2}
-            textAnchor="middle" fontSize={9} fill="#93c5fd">
+          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + 20 + (SUPPORT_H - 40) / 2 + 4}
+            textAnchor="middle" fontSize={9} fill="#3b82f6">
             7M — Medical/Surgical · UCSF Mission Bay · Floor 7
           </text>
           {/* Satellite workstations */}
           {[1, 3, 6, 8].map((roomIdx) => (
             <g key={roomIdx}>
               <rect x={cMid(roomIdx) - 16} y={SUPPORT_TOP + SUPPORT_H / 2 - 10} width={32} height={20}
-                rx={3} fill="#2563eb" opacity={0.7} />
+                rx={4} fill="#dbeafe" stroke="#93c5fd" strokeWidth={1} />
               <text x={cMid(roomIdx)} y={SUPPORT_TOP + SUPPORT_H / 2 + 5}
-                textAnchor="middle" fontSize={7} fill="white">WS</text>
+                textAnchor="middle" fontSize={7} fill="#1d4ed8" fontWeight="600">WS</text>
             </g>
           ))}
 

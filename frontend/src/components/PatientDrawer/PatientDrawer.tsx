@@ -5,7 +5,6 @@ interface Props {
   onClose: () => void;
 }
 
-const CATEGORY_ORDER = ["history", "cognition", "medications", "hemodynamics", "mobility", "toileting", "procedures", "sensory", "sleep", "bone", "bleed", "age"];
 
 function ScoreBar({ value, max = 100, color }: { value: number; max?: number; color: string }) {
   return (
@@ -56,9 +55,10 @@ export function PatientDrawer({ patient, onClose }: Props) {
     .slice(0, 8);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-white">
       {/* Header */}
-      <div className="flex items-start justify-between p-4 border-b border-gray-200">
+      <div className="flex items-start justify-between p-4 border-b border-slate-100"
+        style={{ background: `linear-gradient(to bottom right, ${colors.bg}, #ffffff)` }}>
         <div>
           <div className="flex items-center gap-3 mb-1">
             <span
@@ -86,7 +86,7 @@ export function PatientDrawer({ patient, onClose }: Props) {
       </div>
 
       {/* Score summary */}
-      <div className="grid grid-cols-3 gap-3 p-4 border-b border-gray-200 bg-gray-50">
+      <div className="grid grid-cols-3 gap-3 p-4 border-b border-slate-100 bg-slate-50">
         <div>
           <p className="text-xs font-medium text-gray-500 mb-1">Fall Likelihood</p>
           <p className="text-2xl font-bold text-gray-900">{patient.fls}</p>

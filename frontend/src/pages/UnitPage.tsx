@@ -64,13 +64,18 @@ export function UnitPage() {
 
         {/* Tier summary chips */}
         <div className="flex gap-2 mb-4 flex-wrap">
-          {tierCounts.map(({ tier, count }) => (
-            <div key={tier} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-white shadow-sm">
-              <span className="text-xs font-bold text-gray-600">T{tier}</span>
-              <span className="text-xs text-gray-500">{TIER_LABELS[tier]}</span>
-              <span className="ml-1 text-sm font-bold text-gray-900">{count}</span>
-            </div>
-          ))}
+          {tierCounts.map(({ tier, count }) => {
+            const accents = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][tier-1];
+            return (
+              <div key={tier} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border shadow-sm"
+                style={{ borderColor: accents + "44" }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: accents }} />
+                <span className="text-xs font-semibold" style={{ color: accents }}>T{tier}</span>
+                <span className="text-xs text-slate-400">{TIER_LABELS[tier]}</span>
+                <span className="text-sm font-bold text-slate-800 ml-0.5">{count}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Floor map */}
@@ -84,9 +89,9 @@ export function UnitPage() {
         {/* List view — sorted by EHI */}
         <div className="mt-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-2">All Patients — sorted by Harm Index</h2>
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <thead className="bg-slate-50 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-200">
                 <tr>
                   <th className="px-3 py-2 text-left">Bed</th>
                   <th className="px-3 py-2 text-left">Patient</th>
@@ -97,29 +102,33 @@ export function UnitPage() {
                   <th className="px-3 py-2 text-left">Flags</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {[...patients]
                   .sort((a, b) => b.ehi - a.ehi)
-                  .map((p) => (
+                  .map((p) => {
+                    const accent = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][p.tier-1];
+                    return (
                     <tr
                       key={p.patient_id}
                       onClick={() => setSelectedPatient(selectedPatient?.patient_id === p.patient_id ? null : p)}
-                      className={`cursor-pointer hover:bg-blue-50 transition-colors ${selectedPatient?.patient_id === p.patient_id ? "bg-blue-50" : ""}`}
+                      className={`cursor-pointer transition-colors ${selectedPatient?.patient_id === p.patient_id ? "bg-blue-50" : "hover:bg-slate-50"}`}
                     >
-                      <td className="px-3 py-2 font-mono text-gray-600">{p.bed}</td>
-                      <td className="px-3 py-2 text-gray-800">{p.name}</td>
+                      <td className="px-3 py-2 font-mono text-slate-500 text-xs">{p.bed}</td>
+                      <td className="px-3 py-2 text-slate-700 font-medium">{p.name}</td>
                       <td className="px-3 py-2 text-center">
-                        <span className="font-bold text-gray-700">T{p.tier}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                          style={{ background: accent + "18", color: accent }}>T{p.tier}</span>
                       </td>
-                      <td className="px-3 py-2 text-right font-medium">{p.fls}</td>
-                      <td className="px-3 py-2 text-right font-medium">{p.iss}</td>
-                      <td className="px-3 py-2 text-right font-bold">{p.ehi.toFixed(0)}</td>
-                      <td className="px-3 py-2 text-xs text-orange-600">
-                        {p.risk_rising && "⚠ Rising "}
+                      <td className="px-3 py-2 text-right text-slate-600">{p.fls}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{p.iss}</td>
+                      <td className="px-3 py-2 text-right font-bold text-slate-800">{p.ehi.toFixed(0)}</td>
+                      <td className="px-3 py-2 text-xs text-orange-500 font-medium">
+                        {p.risk_rising && "↑ Rising "}
                         {p.data_gaps.length > 0 && "⚠ Gap"}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -128,7 +137,7 @@ export function UnitPage() {
 
       {/* Patient drawer — slides in from right */}
       {selectedPatient && (
-        <div className="w-96 border-l border-gray-200 bg-white shadow-lg flex-shrink-0 overflow-hidden">
+        <div className="w-96 border-l border-slate-200 bg-white shadow-xl flex-shrink-0 overflow-hidden">
           <PatientDrawer patient={selectedPatient} onClose={() => setSelectedPatient(null)} />
         </div>
       )}

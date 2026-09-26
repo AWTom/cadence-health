@@ -1,4 +1,4 @@
-import { TIER_COLORS, TIER_LABELS, type PatientScore, type BedConfig } from "../../types";
+import { type PatientScore, type BedConfig } from "../../types";
 
 interface Props {
   bed: BedConfig;
@@ -7,72 +7,100 @@ interface Props {
   onClick: () => void;
 }
 
+const W = 110;
+const H = 88;
+
+// Light-theme tier palette
+const LIGHT_TIER: Record<number, { bg: string; accent: string; text: string; sub: string }> = {
+  1: { bg: "#ffffff", accent: "#3b82f6", text: "#1e40af", sub: "#93c5fd" },
+  2: { bg: "#ffffff", accent: "#06b6d4", text: "#0e7490", sub: "#67e8f9" },
+  3: { bg: "#fffbeb", accent: "#f59e0b", text: "#92400e", sub: "#fcd34d" },
+  4: { bg: "#fff7ed", accent: "#f97316", text: "#9a3412", sub: "#fdba74" },
+  5: { bg: "#fff1f2", accent: "#ef4444", text: "#991b1b", sub: "#fca5a5" },
+};
+
 export function BedTile({ bed, patient, selected, onClick }: Props) {
   const tier = patient?.tier ?? 0;
-  const colors = tier ? TIER_COLORS[tier] : { bg: "#f3f4f6", text: "#6b7280", border: "#d1d5db" };
+  const col = tier ? LIGHT_TIER[tier] : { bg: "#f8fafc", accent: "#cbd5e1", text: "#94a3b8", sub: "#e2e8f0" };
+
+  const stroke = selected ? "#3b82f6" : col.accent + "99";
+  const strokeW = selected ? 2.5 : 1.2;
 
   return (
-    <g
-      onClick={onClick}
-      style={{ cursor: patient ? "pointer" : "default" }}
-      aria-label={patient ? `Bed ${bed.bed_id}, Tier ${tier} ${TIER_LABELS[tier]}` : `Bed ${bed.bed_id} empty`}
-    >
-      <rect
-        x={bed.x}
-        y={bed.y}
-        width={110}
-        height={85}
-        rx={6}
-        fill={colors.bg}
-        stroke={selected ? "#1d4ed8" : colors.border}
-        strokeWidth={selected ? 3 : 1.5}
-      />
-      {/* Bed ID */}
-      <text x={bed.x + 8} y={bed.y + 16} fontSize={10} fill={colors.text} fontWeight="600">
+    <g onClick={onClick} style={{ cursor: patient ? "pointer" : "default" }}
+      aria-label={patient ? `Bed ${bed.bed_id}, Tier ${tier}` : `Bed ${bed.bed_id} empty`}>
+
+      {/* Drop shadow */}
+      <rect x={bed.x + 1} y={bed.y + 2} width={W} height={H} rx={7} fill="rgba(0,0,0,0.06)" />
+
+      {/* Card */}
+      <rect x={bed.x} y={bed.y} width={W} height={H} rx={7}
+        fill={col.bg} stroke={stroke} strokeWidth={strokeW} />
+
+      {/* Top accent stripe */}
+      {tier > 0 && (
+        <rect x={bed.x + 1} y={bed.y + 1} width={W - 2} height={5} rx={6}
+          fill={col.accent} />
+      )}
+
+      {/* Room number */}
+      <text x={bed.x + 7} y={bed.y + 20}
+        fontSize={9.5} fill={col.text} fontWeight="700" fontFamily="monospace">
         {bed.bed_id}
       </text>
-      {/* Tier badge */}
-      {patient && (
+
+      {/* Tier pill */}
+      {tier > 0 && (
         <>
-          <rect
-            x={bed.x + 68}
-            y={bed.y + 5}
-            width={34}
-            height={18}
-            rx={3}
-            fill={colors.border}
-          />
-          <text x={bed.x + 85} y={bed.y + 18} fontSize={10} fill={colors.text} textAnchor="middle" fontWeight="700">
+          <rect x={bed.x + W - 30} y={bed.y + 9} width={24} height={14} rx={7}
+            fill={col.accent} fillOpacity={0.18} />
+          <text x={bed.x + W - 18} y={bed.y + 20}
+            fontSize={9} fill={col.text} textAnchor="middle" fontWeight="800">
             T{tier}
           </text>
-
-          {/* FLS / ISS mini-bars */}
-          <text x={bed.x + 8} y={bed.y + 38} fontSize={9} fill="#6b7280">FLS</text>
-          <rect x={bed.x + 28} y={bed.y + 28} width={74} height={8} rx={2} fill="#e5e7eb" />
-          <rect x={bed.x + 28} y={bed.y + 28} width={Math.max(0, patient.fls * 0.74)} height={8} rx={2}
-            fill={tier >= 4 ? "#f97316" : tier >= 3 ? "#eab308" : "#3b82f6"} />
-
-          <text x={bed.x + 8} y={bed.y + 54} fontSize={9} fill="#6b7280">ISS</text>
-          <rect x={bed.x + 28} y={bed.y + 44} width={74} height={8} rx={2} fill="#e5e7eb" />
-          <rect x={bed.x + 28} y={bed.y + 44} width={Math.max(0, patient.iss * 0.74)} height={8} rx={2}
-            fill="#8b5cf6" />
-
-          {/* Status flags */}
-          <text x={bed.x + 6} y={bed.y + 74} fontSize={8} fill={colors.text}>
-            {patient.risk_rising ? "⚠ Rising" : ""}
-            {patient.data_gaps.length > 0 ? " ⚠ Gap" : ""}
-          </text>
-
-          {/* Icons: camera, alarm */}
-          {bed.has_camera && (
-            <text x={bed.x + 90} y={bed.y + 74} fontSize={10} textAnchor="middle">📷</text>
-          )}
         </>
       )}
-      {!patient && (
-        <text x={bed.x + 55} y={bed.y + 48} fontSize={10} fill="#9ca3af" textAnchor="middle">
-          Empty
-        </text>
+
+      {patient ? (
+        <>
+          {/* EHI value */}
+          <text x={bed.x + 7} y={bed.y + 44}
+            fontSize={22} fill={col.text} fontWeight="800" opacity={0.9}>
+            {Math.round(patient.ehi)}
+          </text>
+          <text x={bed.x + 7 + (patient.ehi >= 100 ? 38 : patient.ehi >= 10 ? 28 : 18)} y={bed.y + 43}
+            fontSize={8} fill={col.text} opacity={0.45} fontWeight="600">EHI</text>
+
+          {/* FLS bar */}
+          <rect x={bed.x + 7} y={bed.y + 52} width={W - 14} height={4} rx={2} fill={col.sub} fillOpacity={0.4} />
+          <rect x={bed.x + 7} y={bed.y + 52}
+            width={Math.max(0, Math.min(patient.fls / 100, 1) * (W - 14))} height={4} rx={2}
+            fill={tier >= 4 ? "#f97316" : tier === 3 ? "#f59e0b" : "#3b82f6"} />
+
+          {/* ISS bar */}
+          <rect x={bed.x + 7} y={bed.y + 60} width={W - 14} height={4} rx={2} fill={col.sub} fillOpacity={0.4} />
+          <rect x={bed.x + 7} y={bed.y + 60}
+            width={Math.max(0, Math.min(patient.iss / 100, 1) * (W - 14))} height={4} rx={2}
+            fill="#a78bfa" />
+
+          {/* Bar labels */}
+          <text x={bed.x + 7} y={bed.y + H - 6} fontSize={7} fill={col.text} opacity={0.4}>FLS</text>
+          <text x={bed.x + 32} y={bed.y + H - 6} fontSize={7} fill={col.text} opacity={0.4}>ISS</text>
+
+          {/* Rising flag */}
+          {patient.risk_rising && (
+            <text x={bed.x + W - 7} y={bed.y + H - 6}
+              fontSize={9} textAnchor="end" fill="#f97316" fontWeight="700">↑</text>
+          )}
+          {/* Camera dot */}
+          {bed.has_camera && !patient.risk_rising && (
+            <circle cx={bed.x + W - 10} cy={bed.y + H - 10} r={3}
+              fill="#0ea5e9" opacity={0.5} />
+          )}
+        </>
+      ) : (
+        <text x={bed.x + W / 2} y={bed.y + H / 2 + 8}
+          textAnchor="middle" fontSize={9} fill="#cbd5e1" fontWeight="500">vacant</text>
       )}
     </g>
   );
