@@ -6,15 +6,17 @@ import { useUnitWebSocket } from "../hooks/useWebSocket";
 import type { UnitDetail, PatientScore } from "../types";
 import { TIER_LABELS } from "../types";
 
+const UNIT_ID = "sunrise";
+
 export function UnitPage() {
   const [unit, setUnit] = useState<UnitDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<PatientScore | null>(null);
 
-  const { patients: wsPatients, connected } = useUnitWebSocket("7M");
+  const { patients: wsPatients, connected } = useUnitWebSocket(UNIT_ID);
 
   useEffect(() => {
-    api.getUnit("7M")
+    api.getUnit(UNIT_ID)
       .then(setUnit)
       .catch((e: Error) => setError(e.message));
   }, []);

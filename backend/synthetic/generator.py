@@ -70,7 +70,7 @@ def make_tier5_patient(now: datetime) -> dict[str, Any]:
         height_cm=158.0,
         bmi=17.6,
     )
-    return {"id": "P001", "name": "Patient 001", "bed": "7M-714", "state": state,
+    return {"id": "P001", "name": "Patient 001", "bed": "114", "state": state,
             "description": "88F osteoporosis, prior hip fx, apixaban, CAM+, post-lorazepam"}
 
 
@@ -109,7 +109,7 @@ def make_postop_knee_patient(now: datetime) -> dict[str, Any]:
         height_cm=178.0,
         bmi=28.7,
     )
-    return {"id": "P002", "name": "Patient 002", "bed": "7M-705", "state": state,
+    return {"id": "P002", "name": "Patient 002", "bed": "105", "state": state,
             "description": "68M post-op day 1 TKR, adductor canal block, PRN oxycodone"}
 
 
@@ -141,7 +141,7 @@ def make_low_risk_patient(now: datetime) -> dict[str, Any]:
         height_cm=175.0,
         bmi=26.8,
     )
-    return {"id": "P003", "name": "Patient 003", "bed": "7M-702", "state": state,
+    return {"id": "P003", "name": "Patient 003", "bed": "102", "state": state,
             "description": "45M pneumonia, no fall risk factors"}
 
 
@@ -180,7 +180,7 @@ def make_dialysis_warfarin_patient(now: datetime) -> dict[str, Any]:
         height_cm=172.0,
         bmi=18.3,
     )
-    return {"id": "P004", "name": "Patient 004", "bed": "7M-716", "state": state,
+    return {"id": "P004", "name": "Patient 004", "bed": "116", "state": state,
             "description": "72M dialysis, warfarin, INR 3.4, low BMI"}
 
 
@@ -222,49 +222,32 @@ def make_ciwa_patient(now: datetime) -> dict[str, Any]:
         height_cm=180.0,
         bmi=24.4,
     )
-    return {"id": "P005", "name": "Patient 005", "bed": "7M-719", "state": state,
+    return {"id": "P005", "name": "Patient 005", "bed": "119", "state": state,
             "description": "54M alcohol withdrawal, CIWA 14, rising"}
 
 
-# UCSF Mission Bay — 7M Medical/Surgical, Floor 7 (Adult Hospital)
-# Double-loaded corridor: 10 north rooms (bay-facing, 701-710) + 10 south rooms (campus-facing, 711-720)
-# SVG layout: north rooms at y=30, south rooms at y=505, 118px horizontal pitch
-# Nurses' station in central zone between corridors; camera rooms cluster around center
+# Sunrise Care Center — small-house nursing home, two resident halls around a shared core.
+# Each bed is placed by hall + slot (0-9, west→east); the frontend owns pixel layout.
 
-def _ucsf_beds() -> list[dict]:
+def _build_beds() -> list[dict]:
     beds = []
-    # North wall — bay-facing (701-710), rooms closer to center have camera coverage
-    for i, room_num in enumerate(range(701, 711)):
-        dist = abs(i - 4.5) + 1  # rooms 705/706 nearest nurses' station
-        beds.append({
-            "bed_id": f"7M-{room_num}",
-            "room": str(room_num),
-            "distance_to_station": round(dist, 1),
-            "has_camera": i in (3, 4, 5, 6),   # 704-707 have virtual-sitter cameras
-            "low_bed": i in (0, 5, 9),
-            "has_alarm": True,
-            "x": 70 + i * 118,
-            "y": 30,
-            "side": "north",
-        })
-    # South wall — campus-facing (711-720)
-    for i, room_num in enumerate(range(711, 721)):
-        dist = abs(i - 4.5) + 1
-        beds.append({
-            "bed_id": f"7M-{room_num}",
-            "room": str(room_num),
-            "distance_to_station": round(dist, 1),
-            "has_camera": i in (3, 4, 5, 6),   # 714-717
-            "low_bed": i in (1, 6, 9),
-            "has_alarm": True,
-            "x": 70 + i * 118,
-            "y": 505,
-            "side": "south",
-        })
+    for hall, first_room, low_bed_slots in (("maple", 101, (0, 5, 9)), ("oak", 111, (1, 6, 9))):
+        for slot in range(10):
+            room = str(first_room + slot)
+            beds.append({
+                "bed_id": room,
+                "room": room,
+                "hall": hall,
+                "slot": slot,
+                "distance_to_station": round(abs(slot - 4.5) + 1, 1),  # slots 4/5 nearest nurse station
+                "has_camera": slot in (3, 4, 5, 6),
+                "low_bed": slot in low_bed_slots,
+                "has_alarm": True,
+            })
     return beds
 
 
-UNIT_BEDS = _ucsf_beds()
+UNIT_BEDS = _build_beds()
 
 
 def build_demo_unit(now: datetime) -> dict:
@@ -290,8 +273,8 @@ def build_demo_unit(now: datetime) -> dict:
         })
 
     return {
-        "unit_id": "7M",
-        "name": "7M — Medical/Surgical · UCSF Mission Bay",
+        "unit_id": "sunrise",
+        "name": "Sunrise Care Center · Maple & Oak Halls",
         "beds": UNIT_BEDS,
         "patients": scripted + fillers,
     }

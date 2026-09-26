@@ -10,7 +10,7 @@ interface Props {
   selectedPatientId: string | null;
 }
 
-// UCSF Mission Bay 7M layout constants (must match generator.py coordinates)
+// Nursing home (small-house model) layout — beds are placed by hall + slot
 const ROOM_W = 110;
 const ROOM_H = 85;
 const PITCH = 118;       // horizontal spacing between rooms
@@ -27,6 +27,11 @@ const CORRIDOR_S_Y = SOUTH_TOP - 45;             // 460 — top of south corrido
 const SUPPORT_TOP = CORRIDOR_N_Y + CORRIDOR_N_H; // 160 — top of central support zone
 const SUPPORT_BOT = CORRIDOR_S_Y;                 // 460 — bottom of central support zone
 const SUPPORT_H = SUPPORT_BOT - SUPPORT_TOP;      // 300
+
+const bedPos = (bed: BedConfig) => ({
+  x: LEFT_X + bed.slot * PITCH,
+  y: bed.hall === "maple" ? NORTH_Y : SOUTH_Y,
+});
 
 const NUM_ROOMS = 10;
 const UNIT_RIGHT = LEFT_X + (NUM_ROOMS - 1) * PITCH + ROOM_W; // rightmost edge of rooms
@@ -63,8 +68,6 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
         .map((b) => b.bed_id)
     );
   }, [beds, patientByBed, tierFilter]);
-
-  const cMid = (n: number) => LEFT_X + n * PITCH + ROOM_W / 2;  // center-x of room n
 
   return (
     <div className="flex flex-col gap-3">
@@ -112,95 +115,81 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
             rx={4} fill="none" stroke="#94a3b8" strokeWidth={2}
           />
 
-          {/* ── North direction label (bay-facing) ── */}
+          {/* ── Wing labels ── */}
           <text x={SVG_W / 2} y={16} textAnchor="middle" fontSize={10} fill="#0ea5e9" fontWeight="600">
-            ↑ San Francisco Bay
+            ↑ Courtyard Garden
           </text>
 
-          {/* ── North corridor band ── */}
+          {/* ── Corridor bands ── */}
           <rect x={ELEV_X} y={CORRIDOR_N_Y} width={STAIR_X + STAIR_W + 20 - ELEV_X} height={CORRIDOR_N_H}
             fill="#f0f9ff" stroke="none" />
-          <text x={ELEV_X + 4} y={CORRIDOR_N_Y + 28} fontSize={9} fill="#0ea5e9">North Corridor</text>
-
-          {/* ── South corridor band ── */}
+          <text x={ELEV_X + 4} y={CORRIDOR_N_Y + 28} fontSize={9} fill="#0ea5e9">Maple Hall · Resident Rooms 101–110</text>
           <rect x={ELEV_X} y={CORRIDOR_S_Y} width={STAIR_X + STAIR_W + 20 - ELEV_X} height={45}
             fill="#f0fdf4" stroke="none" />
-          <text x={ELEV_X + 4} y={CORRIDOR_S_Y + 28} fontSize={9} fill="#16a34a">South Corridor</text>
+          <text x={ELEV_X + 4} y={CORRIDOR_S_Y + 28} fontSize={9} fill="#16a34a">Oak Hall · Resident Rooms 111–120</text>
 
-          {/* ── Central support zone background ── */}
+          {/* ── Shared core background ── */}
           <rect x={ELEV_X} y={SUPPORT_TOP} width={STAIR_X + STAIR_W + 20 - ELEV_X} height={SUPPORT_H}
             fill="#f8fafc" stroke="none" />
 
-          {/* ── Elevator lobby ── */}
+          {/* ── Main entrance / lobby ── */}
           <rect x={ELEV_X} y={SUPPORT_TOP} width={ELEV_W} height={SUPPORT_H}
             fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
-          <text x={ELEV_X + ELEV_W / 2} y={SUPPORT_TOP + SUPPORT_H / 2 - 8}
-            textAnchor="middle" fontSize={9} fill="#475569" fontWeight="600" transform={`rotate(-90,${ELEV_X + ELEV_W / 2},${SUPPORT_TOP + SUPPORT_H / 2})`}>
-            ELEVATOR
-          </text>
-          <text x={ELEV_X + ELEV_W / 2} y={SUPPORT_TOP + SUPPORT_H / 2 + 6}
-            textAnchor="middle" fontSize={8} fill="#64748b" transform={`rotate(-90,${ELEV_X + ELEV_W / 2},${SUPPORT_TOP + SUPPORT_H / 2 + 6})`}>
-            LOBBY
+          <text x={ELEV_X + ELEV_W / 2} y={SUPPORT_TOP + SUPPORT_H / 2}
+            textAnchor="middle" fontSize={9} fill="#475569" fontWeight="600"
+            transform={`rotate(-90,${ELEV_X + ELEV_W / 2},${SUPPORT_TOP + SUPPORT_H / 2})`}>
+            MAIN ENTRANCE
           </text>
 
-          {/* ── Utility rooms ── */}
-          <rect x={UTIL_X} y={SUPPORT_TOP} width={UTIL_W} height={SUPPORT_H / 2 - 2}
-            fill="#fef9c3" stroke="#d97706" strokeWidth={1} strokeDasharray="3,2" />
-          <text x={UTIL_X + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H / 4}
-            textAnchor="middle" fontSize={8} fill="#92400e">Clean</text>
-          <text x={UTIL_X + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H / 4 + 11}
-            textAnchor="middle" fontSize={8} fill="#92400e">Utility</text>
-
-          <rect x={UTIL_X} y={SUPPORT_TOP + SUPPORT_H / 2 + 2} width={UTIL_W} height={SUPPORT_H / 2 - 2}
-            fill="#fce7f3" stroke="#db2777" strokeWidth={1} strokeDasharray="3,2" />
-          <text x={UTIL_X + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H * 3 / 4 + 4}
-            textAnchor="middle" fontSize={8} fill="#9d174d">Soiled</text>
-          <text x={UTIL_X + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H * 3 / 4 + 15}
-            textAnchor="middle" fontSize={8} fill="#9d174d">Utility</text>
-
-          {/* ── Nurses' station (central) ── */}
-          <rect x={NS_X} y={SUPPORT_TOP + 20} width={NS_W} height={SUPPORT_H - 40}
-            rx={8} fill="#eff6ff" stroke="#bfdbfe" strokeWidth={1.5} />
-          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + 20 + (SUPPORT_H - 40) / 2 - 16}
-            textAnchor="middle" fontSize={13} fill="#1e40af" fontWeight="700">
-            Nurses' Station
-          </text>
-          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + 20 + (SUPPORT_H - 40) / 2 + 4}
-            textAnchor="middle" fontSize={9} fill="#3b82f6">
-            7M — Medical/Surgical · UCSF Mission Bay · Floor 7
-          </text>
-          {/* Satellite workstations */}
-          {[1, 3, 6, 8].map((roomIdx) => (
-            <g key={roomIdx}>
-              <rect x={cMid(roomIdx) - 16} y={SUPPORT_TOP + SUPPORT_H / 2 - 10} width={32} height={20}
-                rx={4} fill="#dbeafe" stroke="#93c5fd" strokeWidth={1} />
-              <text x={cMid(roomIdx)} y={SUPPORT_TOP + SUPPORT_H / 2 + 5}
-                textAnchor="middle" fontSize={7} fill="#1d4ed8" fontWeight="600">WS</text>
+          {/* ── Left core: spa/tub room + laundry ── */}
+          {[
+            { y: SUPPORT_TOP, label: ["Spa /", "Tub Room"], fill: "#e0f2fe", stroke: "#0284c7", text: "#075985" },
+            { y: SUPPORT_TOP + SUPPORT_H / 2 + 2, label: ["Laundry /", "Soiled Utility"], fill: "#fce7f3", stroke: "#db2777", text: "#9d174d" },
+          ].map((r) => (
+            <g key={r.label[0]}>
+              <rect x={UTIL_X} y={r.y} width={UTIL_W} height={SUPPORT_H / 2 - 2}
+                fill={r.fill} stroke={r.stroke} strokeWidth={1} strokeDasharray="3,2" />
+              <text x={UTIL_X + UTIL_W / 2} y={r.y + SUPPORT_H / 4 - 4} textAnchor="middle" fontSize={8} fill={r.text}>{r.label[0]}</text>
+              <text x={UTIL_X + UTIL_W / 2} y={r.y + SUPPORT_H / 4 + 7} textAnchor="middle" fontSize={8} fill={r.text}>{r.label[1]}</text>
             </g>
           ))}
 
-          {/* ── Med room + staff area (east of NS) ── */}
-          <rect x={NS_X + NS_W + 8} y={SUPPORT_TOP} width={UTIL_W} height={SUPPORT_H / 2 - 2}
-            fill="#f0fdf4" stroke="#16a34a" strokeWidth={1} strokeDasharray="3,2" />
-          <text x={NS_X + NS_W + 8 + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H / 4}
-            textAnchor="middle" fontSize={8} fill="#166534">Med</text>
-          <text x={NS_X + NS_W + 8 + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H / 4 + 11}
-            textAnchor="middle" fontSize={8} fill="#166534">Room</text>
+          {/* ── Central commons: dining · nurse station · living room ── */}
+          <rect x={NS_X} y={SUPPORT_TOP + 12} width={NS_W / 3 - 6} height={SUPPORT_H - 24}
+            rx={8} fill="#fefce8" stroke="#fde68a" strokeWidth={1.5} />
+          <text x={NS_X + NS_W / 6} y={SUPPORT_TOP + SUPPORT_H / 2 - 4} textAnchor="middle" fontSize={11} fill="#92400e" fontWeight="700">Dining Room</text>
+          <text x={NS_X + NS_W / 6} y={SUPPORT_TOP + SUPPORT_H / 2 + 10} textAnchor="middle" fontSize={8} fill="#b45309">+ Open Kitchen</text>
 
-          <rect x={NS_X + NS_W + 8} y={SUPPORT_TOP + SUPPORT_H / 2 + 2} width={UTIL_W} height={SUPPORT_H / 2 - 2}
-            fill="#eff6ff" stroke="#3b82f6" strokeWidth={1} strokeDasharray="3,2" />
-          <text x={NS_X + NS_W + 8 + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H * 3 / 4 + 4}
-            textAnchor="middle" fontSize={8} fill="#1e40af">Staff</text>
-          <text x={NS_X + NS_W + 8 + UTIL_W / 2} y={SUPPORT_TOP + SUPPORT_H * 3 / 4 + 15}
-            textAnchor="middle" fontSize={8} fill="#1e40af">Lounge</text>
+          <rect x={NS_X + NS_W / 3} y={SUPPORT_TOP + 60} width={NS_W / 3} height={SUPPORT_H - 120}
+            rx={8} fill="#eff6ff" stroke="#bfdbfe" strokeWidth={1.5} />
+          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + SUPPORT_H / 2 - 4} textAnchor="middle" fontSize={12} fill="#1e40af" fontWeight="700">Nurse Station</text>
+          <text x={NS_X + NS_W / 2} y={SUPPORT_TOP + SUPPORT_H / 2 + 12} textAnchor="middle" fontSize={8} fill="#3b82f6">Sunrise Care Center · 1st Floor</text>
 
-          {/* ── Stairwell ── */}
+          <rect x={NS_X + (NS_W * 2) / 3 + 6} y={SUPPORT_TOP + 12} width={NS_W / 3 - 6} height={SUPPORT_H - 24}
+            rx={8} fill="#f0fdf4" stroke="#bbf7d0" strokeWidth={1.5} />
+          <text x={NS_X + (NS_W * 5) / 6} y={SUPPORT_TOP + SUPPORT_H / 2 - 4} textAnchor="middle" fontSize={11} fill="#166534" fontWeight="700">Living Room</text>
+          <text x={NS_X + (NS_W * 5) / 6} y={SUPPORT_TOP + SUPPORT_H / 2 + 10} textAnchor="middle" fontSize={8} fill="#15803d">Activities · Hearth</text>
+
+          {/* ── Right core: med room + therapy ── */}
+          {[
+            { y: SUPPORT_TOP, label: ["Med Room /", "Clean Utility"], fill: "#fef9c3", stroke: "#d97706", text: "#92400e" },
+            { y: SUPPORT_TOP + SUPPORT_H / 2 + 2, label: ["Rehab /", "Therapy"], fill: "#ede9fe", stroke: "#7c3aed", text: "#5b21b6" },
+          ].map((r) => (
+            <g key={r.label[0]}>
+              <rect x={NS_X + NS_W + 8} y={r.y} width={UTIL_W} height={SUPPORT_H / 2 - 2}
+                fill={r.fill} stroke={r.stroke} strokeWidth={1} strokeDasharray="3,2" />
+              <text x={NS_X + NS_W + 8 + UTIL_W / 2} y={r.y + SUPPORT_H / 4 - 4} textAnchor="middle" fontSize={8} fill={r.text}>{r.label[0]}</text>
+              <text x={NS_X + NS_W + 8 + UTIL_W / 2} y={r.y + SUPPORT_H / 4 + 7} textAnchor="middle" fontSize={8} fill={r.text}>{r.label[1]}</text>
+            </g>
+          ))}
+
+          {/* ── Exit to garden ── */}
           <rect x={STAIR_X} y={SUPPORT_TOP} width={STAIR_W} height={SUPPORT_H}
             fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
           <text x={STAIR_X + STAIR_W / 2} y={SUPPORT_TOP + SUPPORT_H / 2}
             textAnchor="middle" fontSize={8} fill="#475569" fontWeight="600"
             transform={`rotate(-90,${STAIR_X + STAIR_W / 2},${SUPPORT_TOP + SUPPORT_H / 2})`}>
-            STAIRS
+            GARDEN EXIT
           </text>
 
           {/* ── Horizontal dividers between rooms and corridors ── */}
@@ -230,8 +219,8 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
             .map((b) => (
               <circle
                 key={`cam-${b.bed_id}`}
-                cx={b.x + ROOM_W / 2}
-                cy={b.y + ROOM_H / 2}
+                cx={bedPos(b).x + ROOM_W / 2}
+                cy={bedPos(b).y + ROOM_H / 2}
                 r={70}
                 fill="none"
                 stroke="#0ea5e9"
@@ -243,7 +232,7 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
 
           {/* ── South direction label ── */}
           <text x={SVG_W / 2} y={SVG_H - 6} textAnchor="middle" fontSize={10} fill="#16a34a" fontWeight="600">
-            ↓ UCSF Campus
+            ↓ Parking / Visitor Entry
           </text>
 
           {/* ── Bed tiles ── */}
@@ -251,6 +240,7 @@ export function FloorMap({ beds, patients, onSelectPatient, selectedPatientId }:
             <BedTile
               key={bed.bed_id}
               bed={bed}
+              {...bedPos(bed)}
               patient={filteredBedIds.has(bed.bed_id) ? patientByBed.get(bed.bed_id) : undefined}
               selected={
                 selectedPatientId !== null &&

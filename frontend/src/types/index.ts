@@ -35,12 +35,12 @@ export interface PatientScore {
 export interface BedConfig {
   bed_id: string;
   room: string;
+  hall: "maple" | "oak";
+  slot: number;
   distance_to_station: number;
   has_camera: boolean;
   low_bed: boolean;
   has_alarm: boolean;
-  x: number;
-  y: number;
 }
 
 export interface UnitDetail {
