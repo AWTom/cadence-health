@@ -2,25 +2,58 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { FloorMap } from "../components/FloorMap/FloorMap";
 import { PatientDrawer } from "../components/PatientDrawer/PatientDrawer";
+import { PtPlanModal } from "../components/PtPlanModal/PtPlanModal";
+import { usePtPlan } from "../hooks/usePtPlan";
 import { useUnitWebSocket } from "../hooks/useWebSocket";
 import type { UnitDetail, PatientScore } from "../types";
-import { TIER_LABELS } from "../types";
+import { CARE_LEVEL_NAMES, byPriority } from "../types";
+
+const UNIT_ID = "sunrise";
+const HINT_KEY = "fallguard.ptPlanHint";
+
+// Breadcrumb tutorial: generate a PT plan, then open a resident
+type TutorialStep = "pt-plan" | "patient" | "done";
 
 export function UnitPage() {
   const [unit, setUnit] = useState<UnitDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<PatientScore | null>(null);
+  const [showPtPlan, setShowPtPlan] = useState(false);
+  const [step, setStepState] = useState<TutorialStep>(() => {
+    try {
+      const saved = localStorage.getItem(HINT_KEY);
+      return saved === "patient" || saved === "done" ? saved : "pt-plan";
+    } catch { return "pt-plan"; }
+  });
 
-  const { patients: wsPatients, connected } = useUnitWebSocket("7M");
+  const setStep = (next: TutorialStep) => {
+    setStepState(next);
+    try { localStorage.setItem(HINT_KEY, next); } catch { /* storage unavailable */ }
+  };
+
+  const selectPatient = (p: PatientScore | null) => {
+    if (p && step === "patient") setStep("done");
+    setSelectedPatient(p);
+  };
+
+  const { patients: wsPatients } = useUnitWebSocket(UNIT_ID);
 
   useEffect(() => {
-    api.getUnit("7M")
+    api.getUnit(UNIT_ID)
       .then(setUnit)
       .catch((e: Error) => setError(e.message));
   }, []);
 
   // Merge REST-loaded unit data with live WebSocket score updates
   const patients = wsPatients.length > 0 ? wsPatients : unit?.patients ?? [];
+  const { plan, report, generatePlan, generateReport } = usePtPlan(patients);
+  const hasPlan = plan.status !== "idle";
+
+  const openNewPlan = () => {
+    if (step === "pt-plan") setStep("patient");
+    generatePlan();
+    setShowPtPlan(true);
+  };
 
   if (error) {
     return (
@@ -43,7 +76,7 @@ export function UnitPage() {
 
   const tierCounts = [1, 2, 3, 4, 5].map((t) => ({
     tier: t,
-    count: patients.filter((p) => p.tier === t).length,
+    count: patients.filter((p) => p.care_level === t).length,
   }));
 
   return (
@@ -51,14 +84,40 @@ export function UnitPage() {
       {/* Main content */}
       <div className="flex-1 overflow-y-auto p-4 min-w-0">
         {/* Unit header */}
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center mb-4 flex-wrap gap-x-5 gap-y-2">
           <div>
             <h1 className="text-xl font-bold text-gray-900">{unit.name}</h1>
             <p className="text-sm text-gray-500">{patients.length} patients · {unit.beds.length} beds</p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-gray-400"}`} />
-            <span className="text-xs text-gray-500">{connected ? "Live" : "Polling"}</span>
+          <div className="relative flex items-center gap-2">
+            <button
+              onClick={openNewPlan}
+              className={`px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors ${step === "pt-plan" ? "ring-4 ring-blue-200 animate-pulse" : ""}`}
+            >
+              {hasPlan ? "Regenerate PT plan" : "Generate PT plan"}
+            </button>
+            {hasPlan && (
+              <button
+                onClick={() => setShowPtPlan(true)}
+                className="px-3 py-1.5 rounded-lg border border-blue-600 text-blue-700 text-sm font-semibold hover:bg-blue-50 transition-colors"
+              >
+                View PT plan{plan.status === "streaming" ? " …" : ""}
+              </button>
+            )}
+            {step === "pt-plan" && (
+              <div role="status" className="absolute left-0 top-full mt-3 z-20 w-64 rounded-lg bg-slate-900 p-3 text-xs text-white shadow-lg">
+                {/* arrow pointing up at the button */}
+                <span className="absolute -top-1.5 left-6 h-3 w-3 rotate-45 bg-slate-900" />
+                <p className="font-semibold text-blue-300">Step 1 of 2</p>
+                <p className="mt-1 leading-relaxed">
+                  Click <span className="font-semibold">Generate PT plan</span> to draft today's 8-hour therapy
+                  schedule for the highest-risk residents.
+                </p>
+                <button onClick={() => setStep("patient")} className="mt-2 font-semibold text-blue-300 hover:text-white">
+                  Got it
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -67,60 +126,74 @@ export function UnitPage() {
           {tierCounts.map(({ tier, count }) => {
             const accents = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][tier-1];
             return (
-              <div key={tier} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border shadow-sm"
-                style={{ borderColor: accents + "44" }}>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: accents }} />
-                <span className="text-xs font-semibold" style={{ color: accents }}>T{tier}</span>
-                <span className="text-xs text-slate-400">{TIER_LABELS[tier]}</span>
-                <span className="text-sm font-bold text-slate-800 ml-0.5">{count}</span>
+              <div key={tier} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200">
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-70" style={{ background: accents }} />
+                <span className="text-xs font-medium text-slate-500">L{tier}</span>
+                <span className="text-xs text-slate-400">{CARE_LEVEL_NAMES[tier]}</span>
+                <span className="text-xs font-semibold text-slate-600 ml-0.5">{count}</span>
               </div>
             );
           })}
         </div>
 
+        {/* Tutorial step 2 — shown once the PT plan modal is closed */}
+        {step === "patient" && !showPtPlan && !selectedPatient && (
+          <div role="status" className="relative mb-4 w-72 rounded-lg bg-slate-900 p-3 text-xs text-white shadow-lg">
+            {/* arrow pointing down at the map */}
+            <span className="absolute -bottom-1.5 left-6 h-3 w-3 rotate-45 bg-slate-900" />
+            <p className="font-semibold text-blue-300">Step 2 of 2</p>
+            <p className="mt-1 leading-relaxed">
+              Click a resident's room on the map to see their Care Level, why they may fall, and what to do.
+            </p>
+            <button onClick={() => setStep("done")} className="mt-2 font-semibold text-blue-300 hover:text-white">
+              Got it
+            </button>
+          </div>
+        )}
+
         {/* Floor map */}
         <FloorMap
           beds={unit.beds}
           patients={patients}
-          onSelectPatient={setSelectedPatient}
+          onSelectPatient={selectPatient}
           selectedPatientId={selectedPatient?.patient_id ?? null}
         />
 
         {/* List view — sorted by EHI */}
         <div className="mt-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">All Patients — sorted by Harm Index</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">All Residents — by Care Level, then Harm Index</h2>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-200">
                 <tr>
                   <th className="px-3 py-2 text-left">Bed</th>
                   <th className="px-3 py-2 text-left">Patient</th>
-                  <th className="px-3 py-2 text-center">Tier</th>
-                  <th className="px-3 py-2 text-right">FLS</th>
-                  <th className="px-3 py-2 text-right">ISS</th>
+                  <th className="px-3 py-2 text-center">Care Level</th>
+                  <th className="px-3 py-2 text-right">Fall</th>
+                  <th className="px-3 py-2 text-left">Injury</th>
                   <th className="px-3 py-2 text-right">EHI</th>
                   <th className="px-3 py-2 text-left">Flags</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {[...patients]
-                  .sort((a, b) => b.ehi - a.ehi)
+                  .sort(byPriority)
                   .map((p) => {
-                    const accent = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][p.tier-1];
+                    const accent = ["#3b82f6","#06b6d4","#f59e0b","#f97316","#ef4444"][p.care_level-1];
                     return (
                     <tr
                       key={p.patient_id}
-                      onClick={() => setSelectedPatient(selectedPatient?.patient_id === p.patient_id ? null : p)}
+                      onClick={() => selectPatient(selectedPatient?.patient_id === p.patient_id ? null : p)}
                       className={`cursor-pointer transition-colors ${selectedPatient?.patient_id === p.patient_id ? "bg-blue-50" : "hover:bg-slate-50"}`}
                     >
                       <td className="px-3 py-2 font-mono text-slate-500 text-xs">{p.bed}</td>
                       <td className="px-3 py-2 text-slate-700 font-medium">{p.name}</td>
                       <td className="px-3 py-2 text-center">
                         <span className="px-2 py-0.5 rounded-full text-xs font-bold"
-                          style={{ background: accent + "18", color: accent }}>T{p.tier}</span>
+                          style={{ background: accent + "18", color: accent }}>L{p.care_level}</span>
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-600">{p.fls}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{p.iss}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{p.fall_score}</td>
+                      <td className="px-3 py-2 text-slate-600">{p.injury_level}</td>
                       <td className="px-3 py-2 text-right font-bold text-slate-800">{p.ehi.toFixed(0)}</td>
                       <td className="px-3 py-2 text-xs text-orange-500 font-medium">
                         {p.risk_rising && "↑ Rising "}
@@ -134,6 +207,15 @@ export function UnitPage() {
           </div>
         </div>
       </div>
+
+      {showPtPlan && (
+        <PtPlanModal
+          plan={plan}
+          report={report}
+          onGenerateReport={() => generateReport(plan.text)}
+          onClose={() => setShowPtPlan(false)}
+        />
+      )}
 
       {/* Patient drawer — slides in from right */}
       {selectedPatient && (

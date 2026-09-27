@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "fallguard-backend"
+region = "us-east-1"
+
+[default.build.parameters]
+cached = true
+
+[default.deploy.parameters]
+resolve_s3 = true
+s3_prefix = "fallguard-backend"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false

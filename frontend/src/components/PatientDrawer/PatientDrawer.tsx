@@ -1,4 +1,4 @@
-import { TIER_COLORS, TIER_LABELS, type PatientScore, type Factor } from "../../types";
+import { CARE_LEVEL_COLORS, type PatientScore, type Factor, type Level } from "../../types";
 
 interface Props {
   patient: PatientScore;
@@ -17,6 +17,16 @@ function ScoreBar({ value, max = 100, color }: { value: number; max?: number; co
   );
 }
 
+const LEVEL_STYLE: Record<Level, string> = {
+  Low: "bg-slate-100 text-slate-600",
+  Medium: "bg-amber-100 text-amber-800",
+  High: "bg-red-100 text-red-700",
+};
+
+function LevelPill({ level }: { level: Level }) {
+  return <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${LEVEL_STYLE[level]}`}>{level}</span>;
+}
+
 function FactorRow({ factor }: { factor: Factor }) {
   const newest = factor.evidence.reduce(
     (a, e) => (!a || (e.timestamp && e.timestamp > (a.timestamp ?? ""))) ? e : a,
@@ -24,7 +34,9 @@ function FactorRow({ factor }: { factor: Factor }) {
   );
   return (
     <div className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
-      <span className="min-w-[2.5rem] text-right font-bold text-gray-700">+{factor.points}</span>
+      <span className="min-w-[2.5rem] text-right font-bold text-gray-700">
+        {factor.points > 0 ? `+${factor.points}` : factor.points < 0 ? factor.points : "•"}
+      </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-gray-800">{factor.label}</span>
@@ -49,10 +61,10 @@ function FactorRow({ factor }: { factor: Factor }) {
 }
 
 export function PatientDrawer({ patient, onClose }: Props) {
-  const colors = TIER_COLORS[patient.tier];
-  const topFactors = [...patient.factors]
-    .sort((a, b) => b.points - a.points)
-    .slice(0, 8);
+  const colors = CARE_LEVEL_COLORS[patient.care_level];
+  // Spec 1.5: explanations show the top 5 factors by points
+  const fallFactors = patient.factors.filter((f) => f.category !== "bone" && f.category !== "bleed").slice(0, 5);
+  const injuryFactors = patient.factors.filter((f) => f.category === "bone" || f.category === "bleed");
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
@@ -65,7 +77,7 @@ export function PatientDrawer({ patient, onClose }: Props) {
               className="px-3 py-1 rounded-full text-sm font-bold"
               style={{ background: colors.bg, color: colors.text, border: `1.5px solid ${colors.border}` }}
             >
-              T{patient.tier} — {TIER_LABELS[patient.tier]}
+              Level {patient.care_level} — {patient.care_level_name}
             </span>
             {patient.risk_rising && (
               <span className="px-2 py-0.5 rounded bg-orange-100 text-orange-700 text-xs font-semibold border border-orange-300">
@@ -85,24 +97,30 @@ export function PatientDrawer({ patient, onClose }: Props) {
         </button>
       </div>
 
+      {/* Care actions */}
+      <div className="px-4 py-3 border-b border-slate-100 text-sm text-slate-700">
+        <span className="font-semibold">Actions: </span>{patient.care_actions}
+      </div>
+
       {/* Score summary */}
       <div className="grid grid-cols-3 gap-3 p-4 border-b border-slate-100 bg-slate-50">
         <div>
-          <p className="text-xs font-medium text-gray-500 mb-1">Fall Likelihood</p>
-          <p className="text-2xl font-bold text-gray-900">{patient.fls}</p>
-          <ScoreBar value={patient.fls} color="#3b82f6" />
+          <p className="text-xs font-medium text-gray-500 mb-1">Fall Score</p>
+          <p className="text-2xl font-bold text-gray-900">{patient.fall_score}</p>
+          <ScoreBar value={patient.fall_score} color="#3b82f6" />
+          <div className="mt-1"><LevelPill level={patient.fall_level} /></div>
         </div>
         <div>
-          <p className="text-xs font-medium text-gray-500 mb-1">Injury Severity</p>
-          <p className="text-2xl font-bold text-gray-900">{patient.iss}</p>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 w-8">Bone</span>
-              <ScoreBar value={patient.iss_bone} color="#8b5cf6" />
+          <p className="text-xs font-medium text-gray-500 mb-1">Injury</p>
+          <div className="mb-1"><LevelPill level={patient.injury_level} /></div>
+          <div className="space-y-1 text-xs text-gray-500">
+            <div className="flex items-center justify-between gap-1">
+              <span>Bone {patient.bone_points} pts · {patient.bone_percentile.toFixed(0)}th pct</span>
+              <LevelPill level={patient.bone_level} />
             </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-400 w-8">Bleed</span>
-              <ScoreBar value={patient.iss_bleed} color="#ef4444" />
+            <div className="flex items-center justify-between gap-1">
+              <span>Bleed</span>
+              <LevelPill level={patient.bleed_level} />
             </div>
           </div>
         </div>
@@ -110,7 +128,7 @@ export function PatientDrawer({ patient, onClose }: Props) {
           <p className="text-xs font-medium text-gray-500 mb-1">Harm Index</p>
           <p className="text-2xl font-bold text-gray-900">{patient.ehi.toFixed(0)}</p>
           <ScoreBar value={patient.ehi} color={colors.border} />
-          <p className="text-xs text-gray-400 mt-1">FLS × ISS / 100</p>
+          <p className="text-xs text-gray-400 mt-1">Fall × bone percentile / 100</p>
         </div>
       </div>
 
@@ -121,22 +139,13 @@ export function PatientDrawer({ patient, onClose }: Props) {
         </div>
       )}
 
-      {/* Top contributing factors */}
       <div className="flex-1 overflow-y-auto p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">
-          Top Contributing Factors
-        </h3>
-        <div>
-          {topFactors.map((f) => (
-            <FactorRow key={f.id} factor={f} />
-          ))}
-        </div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Why they may fall</h3>
+        {fallFactors.length ? fallFactors.map((f) => <FactorRow key={f.id} factor={f} />)
+          : <p className="text-xs text-gray-400">No fall factors.</p>}
 
-        {patient.factors.length > 8 && (
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            + {patient.factors.length - 8} more factors
-          </p>
-        )}
+        <h3 className="text-sm font-semibold text-gray-700 mt-5 mb-2">Injury if they fall</h3>
+        {injuryFactors.map((f) => <FactorRow key={f.id} factor={f} />)}
       </div>
 
       {/* Footer: last calculated */}

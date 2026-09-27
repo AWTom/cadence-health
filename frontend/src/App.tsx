@@ -21,7 +21,7 @@ function Nav() {
       </div>
       <NavLink to="/" end className={linkClass}>Unit Map</NavLink>
       <div className="flex-1" />
-      <span className="text-xs text-slate-400 font-medium">UCSF Mission Bay · 7M</span>
+      <span className="text-xs text-slate-400 font-medium">Sunrise Care Center · Maple &amp; Oak Halls</span>
     </nav>
   );
 }
